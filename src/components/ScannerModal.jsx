@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import jsQR from 'jsqr';
 import { useApp } from '../context/AppContext';
 import { 
   X, 
@@ -7,96 +8,298 @@ import {
   RotateCcw, 
   CheckCircle, 
   AlertCircle, 
-  Sparkles,
-  Keyboard,
+  Upload,
   Building2,
   Users,
   Radio,
-  Flame
+  Flame,
+  Check
 } from 'lucide-react';
 
 export const ScannerModal = () => {
   const { setActiveModal, handleQrScan, showToast, isOnline } = useApp();
   const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
+  const [facingMode, setFacingMode] = useState('environment'); // 'environment' | 'user'
   const [manualCode, setManualCode] = useState('');
   const [scanResult, setScanResult] = useState(null);
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
+  const [capturedTarget, setCapturedTarget] = useState(null);
 
-  // Initialize camera
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const isProcessingRef = useRef(false);
+  const lastProcessedTimeRef = useRef(0);
+  const lastScanCheckRef = useRef(0);
+  const fileInputRef = useRef(null);
+  const barcodeDetectorRef = useRef(null);
+
+  // Initialize camera when modal mounts or facingMode flips
   useEffect(() => {
-    startCamera();
+    let isCancelled = false;
+
+    const init = async () => {
+      await startCamera(facingMode, isCancelled);
+    };
+
+    init();
+
     return () => {
+      isCancelled = true;
       stopCamera();
     };
-  }, []);
-
-  const startCamera = async () => {
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
-        });
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setCameraActive(true);
-        setCameraError(null);
-      } else {
-        setCameraError('Camera API not accessible in this environment. Use test triggers or manual entry below.');
-      }
-    } catch (err) {
-      console.log('Camera error:', err);
-      setCameraError('Camera permission denied or camera unavailable. Test buttons ready below!');
-    }
-  };
+  }, [facingMode]);
 
   const stopCamera = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
     setCameraActive(false);
+    setTorchOn(false);
   };
 
-  const toggleTorch = () => {
+  const startCamera = async (mode, isCancelled = false) => {
+    // Stop any existing stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (!isCancelled) {
+          setCameraError('Camera access requires HTTPS or is not supported in this browser environment.');
+          setCameraActive(false);
+        }
+        return;
+      }
+
+      const constraints = {
+        video: {
+          facingMode: { ideal: mode },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (isCancelled) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+
+      streamRef.current = stream;
+
+      // Check if flashlight / torch capability is available
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack && videoTrack.getCapabilities && videoTrack.getCapabilities().torch) {
+        setTorchSupported(true);
+      } else {
+        setTorchSupported(false);
+      }
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute('playsinline', 'true');
+        try {
+          await videoRef.current.play();
+        } catch (e) {
+          console.log('Video play caught:', e);
+        }
+      }
+
+      setCameraActive(true);
+      setCameraError(null);
+      startScanLoop();
+    } catch (err) {
+      console.warn('Camera start error:', err);
+      if (!isCancelled) {
+        let msg = 'Camera permission denied or camera unavailable.';
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          msg = 'Camera permission was denied. Please allow camera permissions in your browser or use the test triggers below.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          msg = 'No camera found on this device. You can test via manual entry or test buttons below.';
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          msg = 'Camera is in use by another app. Close background camera apps and try again.';
+        }
+        setCameraError(msg);
+        setCameraActive(false);
+      }
+    }
+  };
+
+  const flipCamera = () => {
+    const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(nextMode);
+  };
+
+  const toggleTorch = async () => {
     if (streamRef.current) {
       const track = streamRef.current.getVideoTracks()[0];
       if (track && track.getCapabilities && track.getCapabilities().torch) {
-        track.applyConstraints({
-          advanced: [{ torch: !torchOn }]
-        }).then(() => setTorchOn(!torchOn))
-          .catch(() => showToast('Torch unavailable', 'Flashlight is not supported on this camera', 'warning'));
+        try {
+          await track.applyConstraints({
+            advanced: [{ torch: !torchOn }]
+          });
+          setTorchOn(!torchOn);
+        } catch (e) {
+          showToast('Torch unavailable', 'Could not toggle flashlight on this hardware', 'warning');
+        }
       } else {
-        setTorchOn(!torchOn);
-        showToast('Torch toggled', torchOn ? 'Torch turned off' : 'Torch turned on', 'info');
+        showToast('Torch unavailable', 'Flashlight is not supported on this camera', 'warning');
       }
-    } else {
-      setTorchOn(!torchOn);
     }
   };
 
-  const processCode = (code) => {
-    if (navigator.vibrate) {
-      navigator.vibrate(100);
+  const processCode = useCallback((rawCode) => {
+    if (!rawCode) return;
+
+    // Clean and extract code (handle full URL encoding or trailing spaces)
+    let cleanCode = String(rawCode).trim();
+    const match = cleanCode.match(/JTF26-[A-Z0-9_-]+/i);
+    if (match) {
+      cleanCode = match[0].toUpperCase();
     }
-    const res = handleQrScan(code);
+
+    if (navigator.vibrate) {
+      navigator.vibrate([80, 40, 80]);
+    }
+
+    setCapturedTarget(cleanCode);
+    const res = handleQrScan(cleanCode);
     setScanResult(res);
 
     if (res && res.success) {
       setTimeout(() => {
         setActiveModal(null);
-      }, 1400);
+      }, 1500);
     }
+  }, [handleQrScan, setActiveModal]);
+
+  const startScanLoop = () => {
+    const scan = async () => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+
+      if (!video || !canvas || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        animationFrameRef.current = requestAnimationFrame(scan);
+        return;
+      }
+
+      const now = Date.now();
+      // Throttle scanning to ~120ms intervals for smooth performance and battery life
+      if (now - lastScanCheckRef.current > 120) {
+        lastScanCheckRef.current = now;
+
+        const width = video.videoWidth;
+        const height = video.videoHeight;
+
+        if (width && height) {
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+          }
+
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, width, height);
+
+            let detectedText = null;
+
+            // 1. Hardware accelerated native BarcodeDetector if available
+            if ('BarcodeDetector' in window) {
+              try {
+                if (!barcodeDetectorRef.current) {
+                  barcodeDetectorRef.current = new window.BarcodeDetector({ formats: ['qr_code'] });
+                }
+                const barcodes = await barcodeDetectorRef.current.detect(canvas);
+                if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                  detectedText = barcodes[0].rawValue;
+                }
+              } catch (e) {
+                // Silently fallback to jsQR
+              }
+            }
+
+            // 2. Pure JS decoding with jsQR
+            if (!detectedText) {
+              try {
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const decoded = jsQR(imageData.data, imageData.width, imageData.height, {
+                  inversionAttempts: 'dontInvert'
+                });
+                if (decoded && decoded.data) {
+                  detectedText = decoded.data;
+                }
+              } catch (err) {
+                // Frame read error
+              }
+            }
+
+            // If a code was detected and cooldown period passed
+            if (detectedText && !isProcessingRef.current && (now - lastProcessedTimeRef.current > 2500)) {
+              lastProcessedTimeRef.current = now;
+              isProcessingRef.current = true;
+              processCode(detectedText);
+              setTimeout(() => {
+                isProcessingRef.current = false;
+              }, 2200);
+            }
+          }
+        }
+      }
+
+      animationFrameRef.current = requestAnimationFrame(scan);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(scan);
+  };
+
+  // Upload an image containing a QR code from gallery / screenshot
+  const handleImageFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = img.width;
+        offCanvas.height = img.height;
+        const ctx = offCanvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imgData = ctx.getImageData(0, 0, img.width, img.height);
+        const code = jsQR(imgData.data, imgData.width, imgData.height);
+        if (code && code.data) {
+          processCode(code.data);
+        } else {
+          showToast('No QR Code Found', 'No readable QR code was detected in that image. Try direct camera scanning or manual entry.', 'warning');
+        }
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
     if (!manualCode.trim()) return;
-    processCode(manualCode.trim().toUpperCase());
+    processCode(manualCode.trim());
   };
 
   return (
@@ -135,27 +338,37 @@ export const ScannerModal = () => {
           alignItems: 'center',
           justifyContent: 'center'
         }}>
-          {cameraActive ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover'
-              }}
-            />
-          ) : (
+          {/* Real Video Element (always mounted so refs attach cleanly) */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            onLoadedMetadata={() => {
+              videoRef.current?.play().catch(e => console.log('play on metadata:', e));
+            }}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: cameraActive ? 'block' : 'none'
+            }}
+          />
+
+          {/* Hidden Canvas for QR Frame Analysis */}
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+          {/* Fallback Camera Placeholder when camera is inactive/error */}
+          {!cameraActive && (
             <div style={{
               textAlign: 'center',
               padding: '20px',
-              color: 'var(--text-muted)'
+              color: 'var(--text-muted)',
+              zIndex: 1
             }}>
               <Camera size={44} style={{ opacity: 0.4, marginBottom: '8px' }} />
-              <p style={{ fontSize: '13px' }}>
-                {cameraError || 'Camera active. Point at any TechFest badge, booth, or session QR.'}
+              <p style={{ fontSize: '13px', maxWidth: '320px', margin: '0 auto', color: cameraError ? '#FF8A80' : 'var(--text-muted)' }}>
+                {cameraError || 'Initializing camera stream...'}
               </p>
             </div>
           )}
@@ -163,12 +376,16 @@ export const ScannerModal = () => {
           {/* High-tech Viewfinder reticle */}
           <div style={{
             position: 'absolute',
-            width: '200px',
-            height: '200px',
-            border: '2px solid rgba(0, 230, 118, 0.4)',
+            width: '210px',
+            height: '210px',
+            border: scanResult?.success ? '2px solid #00E676' : '2px solid rgba(0, 230, 118, 0.4)',
             borderRadius: '20px',
             pointerEvents: 'none',
-            boxShadow: '0 0 25px rgba(0, 230, 118, 0.2), inset 0 0 25px rgba(0, 230, 118, 0.15)'
+            boxShadow: scanResult?.success 
+              ? '0 0 35px rgba(0, 230, 118, 0.6), inset 0 0 25px rgba(0, 230, 118, 0.4)'
+              : '0 0 25px rgba(0, 230, 118, 0.2), inset 0 0 25px rgba(0, 230, 118, 0.15)',
+            transition: 'all 0.3s ease',
+            zIndex: 2
           }}>
             {/* Viewfinder corners */}
             <div style={{ position: 'absolute', top: '-2px', left: '-2px', width: '24px', height: '24px', borderTop: '4px solid #00E676', borderLeft: '4px solid #00E676', borderTopLeftRadius: '16px' }} />
@@ -177,40 +394,115 @@ export const ScannerModal = () => {
             <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '24px', height: '24px', borderBottom: '4px solid #00E676', borderRight: '4px solid #00E676', borderBottomRightRadius: '16px' }} />
 
             {/* Laser scanning line */}
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '10px',
-              right: '10px',
-              height: '2px',
-              background: '#00E676',
-              boxShadow: '0 0 10px #00E676',
-              animation: 'pulse-glow 1.5s infinite ease-in-out'
-            }} />
+            {cameraActive && !scanResult?.success && (
+              <div style={{
+                position: 'absolute',
+                left: '8px',
+                right: '8px',
+                height: '2px',
+                background: '#00E676',
+                boxShadow: '0 0 12px #00E676, 0 0 4px #FFF',
+                animation: 'scanLaser 2.2s infinite ease-in-out'
+              }} />
+            )}
+
+            {/* Target acquired lock overlay */}
+            {scanResult?.success && (
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(0, 230, 118, 0.15)',
+                borderRadius: '18px'
+              }}>
+                <CheckCircle size={48} color="#00E676" style={{ filter: 'drop-shadow(0 0 10px #00E676)' }} />
+              </div>
+            )}
           </div>
 
-          {/* Flashlight toggle */}
-          <button
-            onClick={toggleTorch}
-            style={{
-              position: 'absolute',
-              bottom: '12px',
-              right: '12px',
-              background: torchOn ? '#00E676' : 'rgba(0, 0, 0, 0.6)',
-              color: torchOn ? '#000' : '#FFF',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer'
-            }}
-            title="Toggle Torch"
-          >
-            <Flashlight size={18} />
-          </button>
+          {/* Viewfinder Controls (Torch, Flip Camera, Upload Image) */}
+          <div style={{
+            position: 'absolute',
+            bottom: '12px',
+            right: '12px',
+            display: 'flex',
+            gap: '8px',
+            zIndex: 3
+          }}>
+            {/* Gallery / Image Upload */}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              accept="image/*" 
+              style={{ display: 'none' }} 
+              onChange={handleImageFileChange} 
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                background: 'rgba(0, 0, 0, 0.65)',
+                color: '#FFF',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(8px)'
+              }}
+              title="Upload QR Code Image"
+            >
+              <Upload size={18} />
+            </button>
+
+            {/* Camera Switcher (Front/Back) */}
+            <button
+              onClick={flipCamera}
+              style={{
+                background: 'rgba(0, 0, 0, 0.65)',
+                color: '#FFF',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(8px)'
+              }}
+              title="Flip Camera (Front/Back)"
+            >
+              <RotateCcw size={18} />
+            </button>
+
+            {/* Flashlight toggle */}
+            {torchSupported && (
+              <button
+                onClick={toggleTorch}
+                style={{
+                  background: torchOn ? '#00E676' : 'rgba(0, 0, 0, 0.65)',
+                  color: torchOn ? '#000' : '#FFF',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(8px)'
+                }}
+                title="Toggle Torch"
+              >
+                <Flashlight size={18} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Body & Fast Test Simulator */}
@@ -236,7 +528,7 @@ export const ScannerModal = () => {
                   {scanResult.success ? 'Scan Verified!' : 'Scan Issue'}
                 </span>
                 <p style={{ color: 'var(--text-light)', marginTop: '2px' }}>
-                  {scanResult.success ? `Captured ${scanResult.name || 'target'}` : scanResult.reason}
+                  {scanResult.success ? `Captured ${scanResult.name || capturedTarget || 'target'}` : scanResult.reason}
                 </p>
               </div>
             </div>
@@ -331,10 +623,10 @@ export const ScannerModal = () => {
             </div>
           </div>
 
-          {/* Fallback Manual Code Entry (Q6) */}
+          {/* Fallback Manual Code Entry */}
           <form onSubmit={handleManualSubmit} style={{ marginTop: '8px' }}>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-              Or type a code manually if camera is obstructed:
+              Or enter code / token manually:
             </span>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input

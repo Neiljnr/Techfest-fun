@@ -1023,3 +1023,9 @@ h1, h2, h3, h4, h5 {
   0%, 100% { border-color: rgba(255, 82, 82, 0.3); }
   50% { border-color: rgba(255, 82, 82, 0.9); }
 }
+
+@keyframes scanLaser {
+  0% { top: 10%; opacity: 0.7; }
+  50% { top: 88%; opacity: 1; }
+  100% { top: 10%; opacity: 0.7; }
+}
