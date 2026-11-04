@@ -187,7 +187,7 @@ export const ScannerModal = () => {
     const res = handleQrScan(cleanCode);
     setScanResult(res);
 
-    if (res && res.success && res.type !== 'signup_invite') {
+    if (res && res.success && res.type !== 'signup_invite' && res.type !== 'attendee_code') {
       setTimeout(() => {
         setActiveModal(null);
       }, 1500);
@@ -556,7 +556,11 @@ export const ScannerModal = () => {
                   {scanResult.success ? 'Scan Verified!' : 'Scan Issue'}
                 </span>
                 <p style={{ color: 'var(--text-light)', marginTop: '2px' }}>
-                  {scanResult.success ? `Captured ${scanResult.name || capturedTarget || 'target'}` : scanResult.reason}
+                  {scanResult.success
+                    ? scanResult.code
+                      ? `Code: ${scanResult.code}`
+                      : `Captured ${scanResult.name || capturedTarget || 'target'}`
+                    : scanResult.reason}
                 </p>
               </div>
             </div>
