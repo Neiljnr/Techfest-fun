@@ -498,6 +498,24 @@ export const AppProvider = ({ children }) => {
   const handleQrScan = (rawCode) => {
     playTone('scan');
 
+    const isGuestUser = !user || !user.email || !user.isOnboarded;
+
+    if (isGuestUser) {
+      const invite = getInviteFromCode(rawCode, user);
+      if (invite) {
+        setSignupInvite(invite);
+        setSignupMode(true);
+        setActiveModal('signup');
+        showToast('Register to continue', `${invite.name} invited you. Complete signup to unlock access.`, 'info');
+        return { success: true, type: 'registration_required', name: invite.name };
+      }
+
+      setSignupMode(true);
+      setActiveModal('signup');
+      showToast('Create your account', 'Scan a badge and register to use TechFest Quest.', 'info');
+      return { success: true, type: 'register_first' };
+    }
+
     if (signupMode) {
       const invite = getInviteFromCode(rawCode, user);
       if (!invite) {
