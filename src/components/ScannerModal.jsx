@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export const ScannerModal = () => {
-  const { setActiveModal, handleQrScan, showToast, isOnline } = useApp();
+  const { setActiveModal, handleQrScan, showToast, isOnline, signupMode } = useApp();
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -29,6 +29,8 @@ export const ScannerModal = () => {
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const frameRef = useRef(null);
+  const reticleRef = useRef(null);
   const streamRef = useRef(null);
   const animationFrameRef = useRef(null);
   const isProcessingRef = useRef(false);
@@ -90,7 +92,8 @@ export const ScannerModal = () => {
         video: {
           facingMode: { ideal: mode },
           width: { ideal: 1280 },
-          height: { ideal: 720 }
+          height: { ideal: 1280 },
+          aspectRatio: { ideal: 1 }
         },
         audio: false
       };
@@ -169,9 +172,11 @@ export const ScannerModal = () => {
 
     // Clean and extract code (handle full URL encoding or trailing spaces)
     let cleanCode = String(rawCode).trim();
-    const match = cleanCode.match(/JTF26-[A-Z0-9_-]+/i);
-    if (match) {
-      cleanCode = match[0].toUpperCase();
+    if (!/^https?:\/\//i.test(cleanCode)) {
+      const match = cleanCode.match(/JTF26-[A-Z0-9_-]+/i);
+      if (match) {
+        cleanCode = match[0].toUpperCase();
+      }
     }
 
     if (navigator.vibrate) {
@@ -182,7 +187,7 @@ export const ScannerModal = () => {
     const res = handleQrScan(cleanCode);
     setScanResult(res);
 
-    if (res && res.success) {
+    if (res && res.success && res.type !== 'signup_invite') {
       setTimeout(() => {
         setActiveModal(null);
       }, 1500);
@@ -194,7 +199,7 @@ export const ScannerModal = () => {
       const video = videoRef.current;
       const canvas = canvasRef.current;
 
-      if (!video || !canvas || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      if (!video || !canvas || !frameRef.current || !reticleRef.current || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
         animationFrameRef.current = requestAnimationFrame(scan);
         return;
       }
@@ -208,14 +213,31 @@ export const ScannerModal = () => {
         const height = video.videoHeight;
 
         if (width && height) {
-          if (canvas.width !== width || canvas.height !== height) {
-            canvas.width = width;
-            canvas.height = height;
+          if (canvas.width !== 512 || canvas.height !== 512) {
+            canvas.width = 512;
+            canvas.height = 512;
           }
 
           const ctx = canvas.getContext('2d', { willReadFrequently: true });
           if (ctx) {
-            ctx.drawImage(video, 0, 0, width, height);
+            const frameBounds = frameRef.current.getBoundingClientRect();
+            const targetBounds = reticleRef.current.getBoundingClientRect();
+            const scale = Math.max(frameBounds.width / width, frameBounds.height / height);
+            const displayedWidth = width * scale;
+            const displayedHeight = height * scale;
+            const sourceX = Math.max(0, (
+              targetBounds.left - frameBounds.left + (displayedWidth - frameBounds.width) / 2
+            ) / scale);
+            const sourceY = Math.max(0, (
+              targetBounds.top - frameBounds.top + (displayedHeight - frameBounds.height) / 2
+            ) / scale);
+            const sourceWidth = Math.min(targetBounds.width / scale, width - sourceX);
+            const sourceHeight = Math.min(targetBounds.height / scale, height - sourceY);
+            if (sourceWidth <= 0 || sourceHeight <= 0) {
+              animationFrameRef.current = requestAnimationFrame(scan);
+              return;
+            }
+            ctx.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
 
             let detectedText = null;
 
@@ -237,7 +259,7 @@ export const ScannerModal = () => {
             // 2. Pure JS decoding with jsQR
             if (!detectedText) {
               try {
-                const imageData = ctx.getImageData(0, 0, width, height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 const decoded = jsQR(imageData.data, imageData.width, imageData.height, {
                   inversionAttempts: 'dontInvert'
                 });
@@ -328,10 +350,10 @@ export const ScannerModal = () => {
         </div>
 
         {/* Viewfinder Area */}
-        <div style={{
+        <div ref={frameRef} style={{
           position: 'relative',
           width: '100%',
-          height: '280px',
+          height: '320px',
           background: '#020302',
           overflow: 'hidden',
           display: 'flex',
@@ -374,10 +396,10 @@ export const ScannerModal = () => {
           )}
 
           {/* High-tech Viewfinder reticle */}
-          <div style={{
+          <div ref={reticleRef} style={{
             position: 'absolute',
-            width: '210px',
-            height: '210px',
+            width: 'min(78vw, 260px)',
+            height: 'min(78vw, 260px)',
             border: scanResult?.success ? '2px solid #00E676' : '2px solid rgba(0, 230, 118, 0.4)',
             borderRadius: '20px',
             pointerEvents: 'none',
@@ -507,6 +529,12 @@ export const ScannerModal = () => {
 
         {/* Body & Fast Test Simulator */}
         <div className="modal-body" style={{ paddingBottom: '30px' }}>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+            {signupMode
+              ? 'Place the operator QR fully inside the green frame to join through their invite.'
+              : 'Center one QR code inside the green frame. Only the framed area is scanned.'}
+          </p>
+
           {/* Scan result status */}
           {scanResult && (
             <div style={{

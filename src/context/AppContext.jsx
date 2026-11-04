@@ -11,6 +11,61 @@ import { getAvatarMeta, getRoleMeta } from '../data/avatars';
 
 const AppContext = createContext();
 
+const readStorage = (key, fallback) => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved === null) return fallback;
+    return saved;
+  } catch (e) {
+    return fallback;
+  }
+};
+
+const readStoredJson = (key, fallback) => {
+  const saved = readStorage(key, null);
+  if (saved === null) return fallback;
+
+  try {
+    return JSON.parse(saved);
+  } catch (e) {
+    return fallback;
+  }
+};
+
+const writeStorage = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    // Storage may be unavailable in private browsing or restricted environments.
+  }
+};
+
+const isValidInvite = (profile) => (
+  profile &&
+  typeof profile.id === 'string' &&
+  typeof profile.name === 'string' &&
+  typeof profile.role === 'string'
+);
+
+const getInviteFromCode = (rawCode, currentUser) => {
+  const code = String(rawCode || '').trim();
+
+  try {
+    const joinData = new URL(code).searchParams.get('join');
+    if (joinData) {
+      const profile = JSON.parse(joinData);
+      if (isValidInvite(profile)) return profile;
+    }
+  } catch (e) {
+    // Not an invite URL; try a regular attendee token below.
+  }
+
+  const attendee = MOCK_ATTENDEES.find(profile => profile.qrToken === code);
+  if (attendee) return attendee;
+  if (currentUser.qrToken === code) return currentUser;
+  return null;
+};
+
 // Simple Web Audio API sound generator for snappy feedback
 const playTone = (type) => {
   try {
@@ -68,9 +123,9 @@ const playTone = (type) => {
 export const AppProvider = ({ children }) => {
   // Persistent state initialized from localStorage
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('techfest_user');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    const savedUser = readStoredJson('techfest_user', null);
+    if (savedUser) {
+      return savedUser;
     }
     return {
       id: 'op-neil-92',
@@ -91,14 +146,14 @@ export const AppProvider = ({ children }) => {
   });
 
   const [points, setPoints] = useState(() => {
-    const saved = localStorage.getItem('techfest_points');
-    return saved ? parseInt(saved, 10) : 5; // Starts with 5 for profile completion
+    const saved = readStorage('techfest_points', null);
+    return saved !== null ? parseInt(saved, 10) : 5; // Starts with 5 for profile completion
   });
 
   const [ledger, setLedger] = useState(() => {
-    const saved = localStorage.getItem('techfest_ledger');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    const savedLedger = readStoredJson('techfest_ledger', null);
+    if (savedLedger) {
+      return savedLedger;
     }
     return [
       {
@@ -115,18 +170,18 @@ export const AppProvider = ({ children }) => {
   });
 
   const [stage1Quests, setStage1Quests] = useState(() => {
-    const saved = localStorage.getItem('techfest_stage1');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    const savedStage1 = readStoredJson('techfest_stage1', null);
+    if (savedStage1) {
+      return savedStage1;
     }
     return INITIAL_STAGE1_QUESTS;
   });
 
   // Stage 2: People connections
   const [connections, setConnections] = useState(() => {
-    const saved = localStorage.getItem('techfest_connections');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    const savedConnections = readStoredJson('techfest_connections', null);
+    if (savedConnections) {
+      return savedConnections;
     }
     return [
       {
@@ -167,9 +222,9 @@ export const AppProvider = ({ children }) => {
 
   // Stage 3: Prompt Blitz status
   const [blitzState, setBlitzState] = useState(() => {
-    const saved = localStorage.getItem('techfest_blitz');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    const savedBlitz = readStoredJson('techfest_blitz', null);
+    if (savedBlitz) {
+      return savedBlitz;
     }
     return {
       completed: false,
@@ -183,9 +238,9 @@ export const AppProvider = ({ children }) => {
 
   // Stage 4: Partner visits
   const [partnerVisits, setPartnerVisits] = useState(() => {
-    const saved = localStorage.getItem('techfest_partners');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    const savedPartnerVisits = readStoredJson('techfest_partners', null);
+    if (savedPartnerVisits) {
+      return savedPartnerVisits;
     }
     return {
       'partner-pictda': { scanned: true, taskCompleted: true, points: 25 },
@@ -195,18 +250,18 @@ export const AppProvider = ({ children }) => {
 
   // Keynote Capture sessions
   const [capturedSessions, setCapturedSessions] = useState(() => {
-    const saved = localStorage.getItem('techfest_sessions');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    const savedSessions = readStoredJson('techfest_sessions', null);
+    if (savedSessions) {
+      return savedSessions;
     }
     return ['sess-1'];
   });
 
   // Signal Drops claimed
   const [claimedDrops, setClaimedDrops] = useState(() => {
-    const saved = localStorage.getItem('techfest_drops');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    const savedDrops = readStoredJson('techfest_drops', null);
+    if (savedDrops) {
+      return savedDrops;
     }
     return [];
   });
@@ -223,43 +278,64 @@ export const AppProvider = ({ children }) => {
   const [currentTab, setCurrentTab] = useState('home'); // 'home', 'people', 'plug', 'board', 'admin', 'venue'
   const [activeModal, setActiveModal] = useState(null); // 'scanner', 'stage_detail', 'blitz', 'partner_detail', 'operator_card', 'privacy', 'profile'
   const [modalData, setModalData] = useState(null);
+  const [signupMode, setSignupMode] = useState(false);
+  const [signupInvite, setSignupInvite] = useState(null);
 
   // Sync to localStorage
   useEffect(() => {
-    localStorage.setItem('techfest_user', JSON.stringify(user));
+    writeStorage('techfest_user', JSON.stringify(user));
   }, [user]);
 
   useEffect(() => {
-    localStorage.setItem('techfest_points', points.toString());
+    writeStorage('techfest_points', points.toString());
   }, [points]);
 
   useEffect(() => {
-    localStorage.setItem('techfest_ledger', JSON.stringify(ledger));
+    writeStorage('techfest_ledger', JSON.stringify(ledger));
   }, [ledger]);
 
   useEffect(() => {
-    localStorage.setItem('techfest_stage1', JSON.stringify(stage1Quests));
+    writeStorage('techfest_stage1', JSON.stringify(stage1Quests));
   }, [stage1Quests]);
 
   useEffect(() => {
-    localStorage.setItem('techfest_connections', JSON.stringify(connections));
+    writeStorage('techfest_connections', JSON.stringify(connections));
   }, [connections]);
 
   useEffect(() => {
-    localStorage.setItem('techfest_blitz', JSON.stringify(blitzState));
+    writeStorage('techfest_blitz', JSON.stringify(blitzState));
   }, [blitzState]);
 
   useEffect(() => {
-    localStorage.setItem('techfest_partners', JSON.stringify(partnerVisits));
+    writeStorage('techfest_partners', JSON.stringify(partnerVisits));
   }, [partnerVisits]);
 
   useEffect(() => {
-    localStorage.setItem('techfest_sessions', JSON.stringify(capturedSessions));
+    writeStorage('techfest_sessions', JSON.stringify(capturedSessions));
   }, [capturedSessions]);
 
   useEffect(() => {
-    localStorage.setItem('techfest_drops', JSON.stringify(claimedDrops));
+    writeStorage('techfest_drops', JSON.stringify(claimedDrops));
   }, [claimedDrops]);
+
+  useEffect(() => {
+    const joinData = new URLSearchParams(window.location.search).get('join');
+    if (!joinData) return;
+
+    try {
+      const profile = JSON.parse(joinData);
+      if (!isValidInvite(profile)) {
+        throw new Error('The invite QR does not contain a valid operator profile.');
+      }
+
+      setSignupInvite(profile);
+      setSignupMode(true);
+      setActiveModal('signup');
+      window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+    } catch (error) {
+      showToast('Invite Link Invalid', error.message, 'error');
+    }
+  }, []);
 
   // Toast auto-clear
   const showToast = (title, message, type = 'success') => {
@@ -424,6 +500,18 @@ export const AppProvider = ({ children }) => {
   const handleQrScan = (rawCode) => {
     playTone('scan');
 
+    if (signupMode) {
+      const invite = getInviteFromCode(rawCode, user);
+      if (!invite) {
+        playTone('error');
+        showToast('Operator QR Not Recognized', 'Scan a TechFest operator badge QR to continue account setup.', 'warning');
+        return { success: false, reason: 'Operator QR not recognized' };
+      }
+      setSignupInvite(invite);
+      setActiveModal('signup');
+      return { success: true, type: 'signup_invite', name: invite.name };
+    }
+
     // If offline, queue the scan!
     if (!isOnline) {
       const queueItem = {
@@ -440,14 +528,19 @@ export const AppProvider = ({ children }) => {
       return { success: true, offline: true };
     }
 
-    // Parse the code type
-    // 1. Attendee: JTF26-ATT-[NAME]-[ID]
-    if (rawCode.startsWith('JTF26-ATT-')) {
-      const match = MOCK_ATTENDEES.find(a => a.qrToken === rawCode || rawCode.includes(a.name.split(' ')[0].toUpperCase()));
-      const attendeeName = match ? match.name : 'TechFest Operator';
-      const attendeeRole = match ? match.role : 'operator';
-      const attendeeAvatar = match ? match.avatarId : 'av-2';
-      const attendeeId = match ? match.id : `user-${Date.now()}`;
+    // 1. Attendee QR: legacy token or a URL carrying a signup invite.
+    const attendeeProfile = getInviteFromCode(rawCode, user);
+    if (attendeeProfile) {
+      const attendeeName = attendeeProfile.name;
+      const attendeeRole = attendeeProfile.role;
+      const attendeeAvatar = attendeeProfile.avatarId || 'av-2';
+      const attendeeId = attendeeProfile.id;
+
+      if (attendeeId === user.id) {
+        playTone('error');
+        showToast('That Is Your QR', 'Scan another operator badge to connect.', 'warning');
+        return { success: false, reason: 'Cannot connect to yourself' };
+      }
 
       // Check if already connected
       if (connections.some(c => c.attendeeId === attendeeId)) {
@@ -552,6 +645,101 @@ export const AppProvider = ({ children }) => {
     playTone('error');
     showToast('Invalid QR Code', 'That QR is not recognized or has expired. Find a fresh one and try again.', 'error');
     return { success: false, reason: 'Unrecognized code' };
+  };
+
+  const startSignup = () => {
+    setSignupInvite(null);
+    setSignupMode(true);
+    setActiveModal('scanner');
+  };
+
+  const cancelSignup = () => {
+    setSignupMode(false);
+    setSignupInvite(null);
+    setActiveModal(null);
+  };
+
+  const completeSignup = ({ name, email, role }) => {
+    if (!signupInvite) {
+      showToast('Invite Required', 'Scan a signed-up operator’s QR before creating your account.', 'warning');
+      return;
+    }
+
+    const normalizedName = name.trim();
+    const newId = `op-${Date.now()}`;
+    const newUser = {
+      id: newId,
+      name: normalizedName,
+      email: email.trim(),
+      role,
+      avatarId: 'av-1',
+      ticketType: 'free',
+      ticketId: `JTF26-REG-${Date.now().toString().slice(-6)}`,
+      hubId: 'hub-jos-innovators',
+      city: 'Jos',
+      bio: '',
+      qrToken: `JTF26-ATT-${normalizedName.replace(/[^A-Z0-9]+/gi, '-').replace(/^-|-$/g, '').toUpperCase()}-${Date.now().toString().slice(-6)}`,
+      isCheckedIn: false,
+      isOnboarded: true,
+      hideFromPublicBoard: false
+    };
+    const isDifferentRole = signupInvite.role !== role;
+    const connectionPoints = isDifferentRole ? 15 : 10;
+    const newConnection = {
+      id: `conn-${Date.now()}`,
+      attendeeId: signupInvite.id,
+      name: signupInvite.name,
+      role: signupInvite.role,
+      avatarId: signupInvite.avatarId || 'av-2',
+      isDifferentRole,
+      pointsAwarded: connectionPoints,
+      confirmedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    setUser(newUser);
+    setPoints(5 + connectionPoints);
+    setLedger([
+      {
+        id: `led-profile-${Date.now()}`,
+        questId: 'q-profile',
+        title: 'Complete Operator Profile',
+        points: 5,
+        stage: 1,
+        timestamp: now,
+        reason: 'Profile setup on onboarding',
+        isReversed: false
+      },
+      {
+        id: `led-connect-${Date.now()}`,
+        questId: `conn-${signupInvite.id}`,
+        title: `Connected with ${signupInvite.name}`,
+        points: connectionPoints,
+        stage: 2,
+        timestamp: now,
+        reason: 'Joined through an operator invite QR',
+        isReversed: false
+      }
+    ]);
+    setStage1Quests(INITIAL_STAGE1_QUESTS);
+    setConnections([newConnection]);
+    setPendingHandshakes([]);
+    setBlitzState({
+      completed: false,
+      score: 0,
+      correctCount: 0,
+      totalAnswered: 0,
+      speedBonusTotal: 0,
+      completedAt: null
+    });
+    setPartnerVisits({});
+    setCapturedSessions([]);
+    setClaimedDrops([]);
+    setSignupMode(false);
+    setSignupInvite(null);
+    setCurrentTab('home');
+    setActiveModal(null);
+    showToast('Account Created!', `You’re connected with ${signupInvite.name}. Your demo account is saved on this browser.`, 'success');
   };
 
   // Replay & sync offline queue
@@ -690,6 +878,11 @@ export const AppProvider = ({ children }) => {
         setCurrentTab,
         activeModal,
         setActiveModal,
+        signupMode,
+        signupInvite,
+        startSignup,
+        cancelSignup,
+        completeSignup,
         modalData,
         setModalData,
         getStageProgress,

@@ -16,6 +16,7 @@ import { PromptBlitzModal } from './components/PromptBlitzModal';
 import { PartnerDetailModal } from './components/PartnerDetailModal';
 import { OperatorCardModal } from './components/OperatorCardModal';
 import { ProfileModal } from './components/ProfileModal';
+import { SignupModal } from './components/SignupModal';
 
 import { 
   Sparkles, 
@@ -108,6 +109,7 @@ export const App = () => {
         {activeModal === 'partner_detail' && <PartnerDetailModal />}
         {activeModal === 'operator_card' && <OperatorCardModal />}
         {activeModal === 'profile' && <ProfileModal />}
+        {activeModal === 'signup' && <SignupModal />}
       </div>
     </div>
   );

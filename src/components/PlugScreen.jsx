@@ -20,27 +20,50 @@ export const PlugScreen = () => {
     pendingHandshakes, 
     confirmHandshake, 
     addPoints,
-    showToast 
+    showToast,
+    startSignup
   } = useApp();
 
   const [qrUrl, setQrUrl] = useState('');
+  const [qrError, setQrError] = useState('');
   const [roundtableCheckedIn, setRoundtableCheckedIn] = useState(false);
 
   // Generate attendee's own QR code
   useEffect(() => {
-    if (user.qrToken) {
-      QRCode.toDataURL(user.qrToken, {
-        width: 220,
-        margin: 1,
+    let isCancelled = false;
+    setQrUrl('');
+    setQrError('');
+
+    const qrToken = user.qrToken || `JTF26-ATT-${user.id}`;
+    const inviteUrl = new URL(window.location.pathname, window.location.origin);
+    inviteUrl.searchParams.set('join', JSON.stringify({
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      avatarId: user.avatarId,
+      qrToken
+    }));
+
+    QRCode.toDataURL(inviteUrl.toString(), {
+        width: 320,
+        margin: 4,
+        errorCorrectionLevel: 'H',
         color: {
-          dark: '#00E676',
-          light: '#0A0E0C'
+          dark: '#000000',
+          light: '#FFFFFF'
         }
       }).then(url => {
-        setQrUrl(url);
+        if (!isCancelled) setQrUrl(url);
+      }).catch(error => {
+        if (!isCancelled) {
+          setQrError(error.message || 'The operator QR could not be generated.');
+        }
       });
-    }
-  }, [user.qrToken]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user.id, user.name, user.role, user.avatarId, user.qrToken]);
 
   const handleRoundtableCheckin = () => {
     if (roundtableCheckedIn) return;
@@ -130,6 +153,24 @@ export const PlugScreen = () => {
       )}
 
       {/* 2. My QR Code Card (High Contrast) */}
+      <div className="quest-card" style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        textAlign: 'center',
+        gap: '10px',
+        borderColor: 'rgba(0, 230, 118, 0.3)'
+      }}>
+        <h3 style={{ fontSize: '15px', fontWeight: '800' }}>New to TechFest Quest?</h3>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+          Scan a signed-up operator’s badge to create your demo account and connect automatically.
+        </p>
+        <button className="pill-btn-action pill-btn-secondary" onClick={startSignup}>
+          <QrCode size={16} />
+          <span>Join with a QR invite</span>
+        </button>
+      </div>
+
       <div 
         className="quest-card" 
         style={{ 
@@ -153,20 +194,24 @@ export const PlugScreen = () => {
         {/* High contrast QR box */}
         {qrUrl ? (
           <div style={{
-            padding: '14px',
-            background: '#070A08',
+            padding: '10px',
+            background: '#FFFFFF',
             border: '2px solid rgba(0, 230, 118, 0.4)',
-            borderRadius: '18px',
-            boxShadow: '0 0 30px rgba(0, 230, 118, 0.2)'
+            borderRadius: '12px',
+            boxShadow: '0 0 24px rgba(0, 230, 118, 0.2)'
           }}>
             <img 
               src={qrUrl} 
               alt="My Badge QR" 
-              style={{ width: '180px', height: '180px', display: 'block' }} 
+              style={{ width: '240px', height: '240px', display: 'block', imageRendering: 'pixelated' }} 
             />
           </div>
+        ) : qrError ? (
+          <p role="alert" style={{ color: '#FF8A80', fontSize: '12px' }}>{qrError}</p>
         ) : (
-          <div style={{ width: '180px', height: '180px', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' }} />
+          <div role="status" style={{ width: '240px', height: '240px', background: '#FFF', borderRadius: '12px', display: 'grid', placeItems: 'center', color: '#111', fontSize: '12px' }}>
+            Preparing your QR…
+          </div>
         )}
 
         <div style={{
