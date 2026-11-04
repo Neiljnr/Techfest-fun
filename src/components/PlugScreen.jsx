@@ -36,6 +36,7 @@ export const PlugScreen = () => {
 
     const qrToken = user.qrToken || `JTF26-ATT-${user.id}`;
     const inviteUrl = new URL(window.location.pathname, window.location.origin);
+    inviteUrl.searchParams.set('register', 'true');
     inviteUrl.searchParams.set('join', JSON.stringify({
       id: user.id,
       name: user.name,

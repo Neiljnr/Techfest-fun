@@ -544,27 +544,54 @@ export const AppProvider = ({ children }) => {
       return { success: true, offline: true };
     }
 
-    // 1. Attendee QR: legacy token or a URL carrying a signup invite.
+    // 1. Registered user scanning another attendee QR: auto-connect and reward them.
     const attendeeProfile = getInviteFromCode(rawCode, user);
     if (attendeeProfile) {
       const attendeeName = attendeeProfile.name;
+      const attendeeRole = attendeeProfile.role;
+      const attendeeAvatar = attendeeProfile.avatarId || 'av-2';
       const attendeeId = attendeeProfile.id;
-      const attendeeCode = attendeeProfile.qrToken || attendeeId;
 
       if (attendeeId === user.id) {
         playTone('error');
-        showToast('That Is Your QR', 'Scan another operator badge to view their code.', 'warning');
-        return { success: false, reason: 'Cannot view your own QR' };
+        showToast('That Is Your QR', 'Scan another operator badge to connect.', 'warning');
+        return { success: false, reason: 'Cannot connect to yourself' };
       }
 
-      showToast('Operator Code Captured', `${attendeeName}'s QR code was read.`, 'info');
-      return {
-        success: true,
-        type: 'attendee_code',
+      if (connections.some(c => c.attendeeId === attendeeId)) {
+        playTone('error');
+        showToast('Already Connected', `You and ${attendeeName} have already plugged in!`, 'warning');
+        return { success: false, reason: 'Already connected' };
+      }
+
+      if (connections.length >= 10) {
+        showToast('Stage 2 Cap Reached', 'You have hit the 10-connection point cap, but network link added!', 'info');
+      }
+
+      const isDiff = attendeeRole !== user.role;
+      const pts = isDiff ? 15 : 10;
+
+      const newConn = {
+        id: `conn-${Date.now()}`,
+        attendeeId,
         name: attendeeName,
-        code: attendeeCode,
-        points: 0
+        role: attendeeRole,
+        avatarId: attendeeAvatar,
+        isDifferentRole: isDiff,
+        pointsAwarded: pts,
+        confirmedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
+
+      setConnections(prev => [newConn, ...prev]);
+      addPoints(
+        `conn-${attendeeId}`,
+        `Two-Way Connect with ${attendeeName}`,
+        pts,
+        2,
+        isDiff ? `Connection (+10) & Role Bonus (+5 for ${attendeeRole} ↔ ${user.role})` : 'Connection (+10)'
+      );
+
+      return { success: true, type: 'attendee', name: attendeeName, points: pts };
     }
 
     // 2. Partner Booth: JTF26-[PARTNER]-B[NUM]
