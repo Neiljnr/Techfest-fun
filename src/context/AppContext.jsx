@@ -328,6 +328,13 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
+  useEffect(() => {
+    if (!user || !user.email || !user.isOnboarded) {
+      setActiveModal('signup');
+      setCurrentTab('home');
+    }
+  }, [user.email, user.isOnboarded]);
+
   // Toast auto-clear
   const showToast = (title, message, type = 'success') => {
     setToastMessage({ title, message, type });

@@ -29,10 +29,21 @@ import {
 } from 'lucide-react';
 
 export const App = () => {
-  const { currentTab, activeModal, toastMessage } = useApp();
+  const { currentTab, activeModal, toastMessage, user } = useApp();
   const [wideMode, setWideMode] = useState(false);
 
   const isVenueMode = currentTab === 'venue';
+  const isRegistered = Boolean(user && user.email && user.isOnboarded);
+
+  if (!isRegistered) {
+    return (
+      <div className="app-container">
+        <div className="app-wrapper" style={{ maxWidth: '480px' }}>
+          <SignupModal />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
