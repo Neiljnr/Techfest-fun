@@ -39,8 +39,8 @@ export const SignupModal = () => {
               </div>
             </div>
           ) : (
-            <p style={{ color: '#FF8A80', fontSize: '13px' }}>
-              No operator invite was found. Close this form and scan a signed-up operator’s QR code.
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+              This signup works with a real Gmail account. You can continue without a QR invite.
             </p>
           )}
 
@@ -81,14 +81,12 @@ export const SignupModal = () => {
           </label>
 
           <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            Demo signup is saved only in this browser; it is not a shared or password-protected account.
+            This app stores the signup locally in the browser so you can test a real Gmail onboarding flow.
           </p>
 
           <button
             type="submit"
             className="pill-btn-action pill-btn-primary"
-            disabled={!signupInvite}
-            style={!signupInvite ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
           >
             <UserPlus size={16} />
             <span>Create account & connect</span>

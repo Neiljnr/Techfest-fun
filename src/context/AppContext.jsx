@@ -40,6 +40,53 @@ const writeStorage = (key, value) => {
   }
 };
 
+const GUEST_USER = () => ({
+  id: '',
+  name: '',
+  email: '',
+  role: 'builder',
+  avatarId: 'av-1',
+  ticketType: 'free',
+  ticketId: '',
+  hubId: '',
+  city: '',
+  bio: '',
+  qrToken: '',
+  isCheckedIn: false,
+  isOnboarded: false,
+  hideFromPublicBoard: false
+});
+
+const isDemoAccount = (profile) => {
+  if (!profile) return false;
+  const demoEmails = ['keziah.pam@gmail.com'];
+  return (
+    profile.id === 'op-neil-92' ||
+    profile.name === 'Keziah Pam' ||
+    demoEmails.includes(String(profile.email || '').toLowerCase())
+  );
+};
+
+const clearDemoStorage = () => {
+  try {
+    const keys = [
+      'techfest_user',
+      'techfest_points',
+      'techfest_ledger',
+      'techfest_stage1',
+      'techfest_connections',
+      'techfest_blitz',
+      'techfest_partners',
+      'techfest_sessions',
+      'techfest_drops',
+      'techfest_visitor_name'
+    ];
+    keys.forEach(key => localStorage.removeItem(key));
+  } catch (e) {
+    // ignore storage restrictions
+  }
+};
+
 const isValidInvite = (profile) => (
   profile &&
   typeof profile.id === 'string' &&
@@ -124,30 +171,19 @@ export const AppProvider = ({ children }) => {
   // Persistent state initialized from localStorage
   const [user, setUser] = useState(() => {
     const savedUser = readStoredJson('techfest_user', null);
-    if (savedUser) {
+    if (savedUser && isDemoAccount(savedUser)) {
+      clearDemoStorage();
+      return GUEST_USER();
+    }
+    if (savedUser && typeof savedUser.name === 'string' && typeof savedUser.email === 'string') {
       return savedUser;
     }
-    return {
-      id: 'op-neil-92',
-      name: 'Keziah Pam',
-      email: 'keziah.pam@gmail.com',
-      role: 'builder',
-      avatarId: 'av-1',
-      ticketType: 'free',
-      ticketId: 'JTF26-REG-88219',
-      hubId: 'hub-jos-innovators',
-      city: 'Jos',
-      bio: 'Training local dialect LLMs & building agritech solutions on the Plateau.',
-      qrToken: 'JTF26-ATT-KEZIAH-88219',
-      isCheckedIn: true, // checked in at Sarau Event Center
-      isOnboarded: true,
-      hideFromPublicBoard: false
-    };
+    return GUEST_USER();
   });
 
   const [points, setPoints] = useState(() => {
     const saved = readStorage('techfest_points', null);
-    return saved !== null ? parseInt(saved, 10) : 5; // Starts with 5 for profile completion
+    return saved !== null ? parseInt(saved, 10) : 0;
   });
 
   const [ledger, setLedger] = useState(() => {
@@ -155,18 +191,7 @@ export const AppProvider = ({ children }) => {
     if (savedLedger) {
       return savedLedger;
     }
-    return [
-      {
-        id: 'led-1',
-        questId: 'q-profile',
-        title: 'Complete Operator Profile',
-        points: 5,
-        stage: 1,
-        timestamp: new Date(Date.now() - 3600000 * 4).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        reason: 'Profile setup on onboarding',
-        isReversed: false
-      }
-    ];
+    return [];
   });
 
   const [stage1Quests, setStage1Quests] = useState(() => {
@@ -183,42 +208,11 @@ export const AppProvider = ({ children }) => {
     if (savedConnections) {
       return savedConnections;
     }
-    return [
-      {
-        id: 'conn-1',
-        attendeeId: 'user-nanret',
-        name: 'Nanret P.',
-        role: 'founder',
-        avatarId: 'av-3',
-        isDifferentRole: true,
-        pointsAwarded: 15, // 10 connection + 5 role bonus
-        confirmedAt: new Date(Date.now() - 7200000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      },
-      {
-        id: 'conn-2',
-        attendeeId: 'user-zainab',
-        name: 'Zainab M.',
-        role: 'designer',
-        avatarId: 'av-5',
-        isDifferentRole: true,
-        pointsAwarded: 15,
-        confirmedAt: new Date(Date.now() - 3600000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ];
+    return [];
   });
 
   // Incoming 2-way pending handshake requests
-  const [pendingHandshakes, setPendingHandshakes] = useState([
-    {
-      id: 'hs-1',
-      senderId: 'user-pam',
-      name: 'Pam K.',
-      role: 'founder',
-      avatarId: 'av-4',
-      expiresIn: 110, // seconds
-      points: 15
-    }
-  ]);
+  const [pendingHandshakes, setPendingHandshakes] = useState([]);
 
   // Stage 3: Prompt Blitz status
   const [blitzState, setBlitzState] = useState(() => {
@@ -242,10 +236,7 @@ export const AppProvider = ({ children }) => {
     if (savedPartnerVisits) {
       return savedPartnerVisits;
     }
-    return {
-      'partner-pictda': { scanned: true, taskCompleted: true, points: 25 },
-      'partner-sarau': { scanned: true, taskCompleted: false, points: 10 }
-    };
+    return {};
   });
 
   // Keynote Capture sessions
@@ -254,7 +245,7 @@ export const AppProvider = ({ children }) => {
     if (savedSessions) {
       return savedSessions;
     }
-    return ['sess-1'];
+    return [];
   });
 
   // Signal Drops claimed
@@ -649,8 +640,8 @@ export const AppProvider = ({ children }) => {
 
   const startSignup = () => {
     setSignupInvite(null);
-    setSignupMode(true);
-    setActiveModal('scanner');
+    setSignupMode(false);
+    setActiveModal('signup');
   };
 
   const cancelSignup = () => {
@@ -660,45 +651,43 @@ export const AppProvider = ({ children }) => {
   };
 
   const completeSignup = ({ name, email, role }) => {
-    if (!signupInvite) {
-      showToast('Invite Required', 'Scan a signed-up operator’s QR before creating your account.', 'warning');
+    const normalizedName = String(name || '').trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    if (!normalizedName) {
+      showToast('Name required', 'Please enter your full name before continuing.', 'warning');
       return;
     }
 
-    const normalizedName = name.trim();
+    if (!normalizedEmail || !/^[^\s@]+@gmail\.com$/i.test(normalizedEmail)) {
+      showToast('Use a valid Gmail address', 'Only Gmail email addresses can be used for this signup flow.', 'warning');
+      return;
+    }
+
     const newId = `op-${Date.now()}`;
+    const slug = normalizedName.replace(/[^A-Z0-9]+/gi, '-').replace(/^-|-$/g, '').toUpperCase() || 'OPERATOR';
     const newUser = {
       id: newId,
       name: normalizedName,
-      email: email.trim(),
-      role,
+      email: normalizedEmail,
+      role: role || 'builder',
       avatarId: 'av-1',
       ticketType: 'free',
-      ticketId: `JTF26-REG-${Date.now().toString().slice(-6)}`,
+      ticketId: `JTF26-REG-${normalizedEmail.split('@')[0].slice(0, 8).toUpperCase()}`,
       hubId: 'hub-jos-innovators',
       city: 'Jos',
       bio: '',
-      qrToken: `JTF26-ATT-${normalizedName.replace(/[^A-Z0-9]+/gi, '-').replace(/^-|-$/g, '').toUpperCase()}-${Date.now().toString().slice(-6)}`,
-      isCheckedIn: false,
+      qrToken: `JTF26-ATT-${slug}-${Date.now().toString().slice(-6)}`,
+      isCheckedIn: true,
       isOnboarded: true,
       hideFromPublicBoard: false
     };
-    const isDifferentRole = signupInvite.role !== role;
-    const connectionPoints = isDifferentRole ? 15 : 10;
-    const newConnection = {
-      id: `conn-${Date.now()}`,
-      attendeeId: signupInvite.id,
-      name: signupInvite.name,
-      role: signupInvite.role,
-      avatarId: signupInvite.avatarId || 'av-2',
-      isDifferentRole,
-      pointsAwarded: connectionPoints,
-      confirmedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
+
+    const nextPoints = 5;
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     setUser(newUser);
-    setPoints(5 + connectionPoints);
+    setPoints(nextPoints);
     setLedger([
       {
         id: `led-profile-${Date.now()}`,
@@ -709,20 +698,9 @@ export const AppProvider = ({ children }) => {
         timestamp: now,
         reason: 'Profile setup on onboarding',
         isReversed: false
-      },
-      {
-        id: `led-connect-${Date.now()}`,
-        questId: `conn-${signupInvite.id}`,
-        title: `Connected with ${signupInvite.name}`,
-        points: connectionPoints,
-        stage: 2,
-        timestamp: now,
-        reason: 'Joined through an operator invite QR',
-        isReversed: false
       }
     ]);
     setStage1Quests(INITIAL_STAGE1_QUESTS);
-    setConnections([newConnection]);
     setPendingHandshakes([]);
     setBlitzState({
       completed: false,
@@ -732,14 +710,58 @@ export const AppProvider = ({ children }) => {
       speedBonusTotal: 0,
       completedAt: null
     });
-    setPartnerVisits({});
-    setCapturedSessions([]);
-    setClaimedDrops([]);
+
+    if (signupInvite) {
+      const isDifferentRole = signupInvite.role !== newUser.role;
+      const connectionPoints = isDifferentRole ? 15 : 10;
+      const newConnection = {
+        id: `conn-${Date.now()}`,
+        attendeeId: signupInvite.id,
+        name: signupInvite.name,
+        role: signupInvite.role,
+        avatarId: signupInvite.avatarId || 'av-2',
+        isDifferentRole,
+        pointsAwarded: connectionPoints,
+        confirmedAt: now
+      };
+
+      setConnections([newConnection]);
+      setPoints(connectionPoints + 5);
+      setLedger([
+        {
+          id: `led-profile-${Date.now()}`,
+          questId: 'q-profile',
+          title: 'Complete Operator Profile',
+          points: 5,
+          stage: 1,
+          timestamp: now,
+          reason: 'Profile setup on onboarding',
+          isReversed: false
+        },
+        {
+          id: `led-connect-${Date.now()}`,
+          questId: `conn-${signupInvite.id}`,
+          title: `Connected with ${signupInvite.name}`,
+          points: connectionPoints,
+          stage: 2,
+          timestamp: now,
+          reason: 'Joined through an operator invite QR',
+          isReversed: false
+        }
+      ]);
+      showToast('Account Created!', `You’re connected with ${signupInvite.name} and saved with your real Gmail account.`, 'success');
+    } else {
+      setConnections([]);
+      setPartnerVisits({});
+      setCapturedSessions([]);
+      setClaimedDrops([]);
+      showToast('Account Created!', `Your real Gmail account for ${normalizedEmail} is now saved in this browser.`, 'success');
+    }
+
     setSignupMode(false);
     setSignupInvite(null);
     setCurrentTab('home');
     setActiveModal(null);
-    showToast('Account Created!', `You’re connected with ${signupInvite.name}. Your demo account is saved on this browser.`, 'success');
   };
 
   // Replay & sync offline queue
