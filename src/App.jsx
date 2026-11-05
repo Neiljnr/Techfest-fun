@@ -16,6 +16,7 @@ import { PartnerDetailModal } from './components/PartnerDetailModal';
 import { OperatorCardModal } from './components/OperatorCardModal';
 import { ProfileModal } from './components/ProfileModal';
 import { SignupModal } from './components/SignupModal';
+import { AdminDashboard } from './components/AdminDashboard';
 
 import { 
   Smartphone, 
@@ -26,17 +27,55 @@ import {
 } from 'lucide-react';
 
 export const App = () => {
-  const { currentTab, activeModal, toastMessage, user } = useApp();
+  const {
+    currentTab, activeModal, toastMessage, user, isAdmin, authLoading,
+    dataLoading, backendError, isSupabaseConfigured, refreshData
+  } = useApp();
   const [wideMode, setWideMode] = useState(false);
 
   const isVenueMode = currentTab === 'venue';
-  const isRegistered = Boolean(user && user.email && user.isOnboarded);
 
-  if (!isRegistered) {
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="app-container">
+        <div className="app-wrapper" style={{ maxWidth: '480px' }}>
+          <main className="main-content">
+            <h1>Supabase setup required</h1>
+            <p>Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to the local environment, run the database migration, then restart the app.</p>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (authLoading) {
+    return <div className="app-container"><div className="app-wrapper"><main className="main-content">Restoring your secure session…</main></div></div>;
+  }
+
+  if (!user) {
     return (
       <div className="app-container">
         <div className="app-wrapper" style={{ maxWidth: '480px' }}>
           <SignupModal />
+          {toastMessage && <div className={`toast-pill ${toastMessage.type}`}>{toastMessage.title}: {toastMessage.message}</div>}
+        </div>
+      </div>
+    );
+  }
+
+  if (dataLoading) {
+    return <div className="app-container"><div className="app-wrapper"><main className="main-content">Loading your event account…</main></div></div>;
+  }
+
+  if (backendError) {
+    return (
+      <div className="app-container">
+        <div className="app-wrapper">
+          <main className="main-content">
+            <h1>Could not load event data</h1>
+            <p>{backendError}</p>
+            <button className="pill-btn-action pill-btn-primary" onClick={() => refreshData()}>Retry</button>
+          </main>
         </div>
       </div>
     );
@@ -94,6 +133,7 @@ export const App = () => {
         {!isVenueMode && <Header />}
 
         {/* Main Tab Screen */}
+        {currentTab === 'admin' && isAdmin ? <AdminDashboard /> : null}
         {currentTab === 'home' && <HomeScreen />}
         {currentTab === 'people' && <PeopleScreen />}
         {currentTab === 'plug' && <PlugScreen />}

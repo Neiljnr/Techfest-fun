@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { MOCK_ATTENDEES } from '../data/mockAttendees';
 import { getAvatarMeta } from '../data/avatars';
 import { 
   Trophy, 
@@ -15,13 +14,13 @@ import {
 import QRCode from 'qrcode';
 
 export const VenueProjectorView = () => {
-  const { user, points, currentRank, setCurrentTab } = useApp();
+  const { user, points, currentRank, setCurrentTab, leaderboard, refreshLeaderboard } = useApp();
   const [screenQr, setScreenQr] = useState('');
   const [tickerIndex, setTickerIndex] = useState(0);
 
   // Generate join game QR for big screen
   useEffect(() => {
-    QRCode.toDataURL('https://techfestjos.org/quest', {
+    QRCode.toDataURL(window.location.origin, {
       width: 200,
       margin: 1,
       color: {
@@ -32,29 +31,38 @@ export const VenueProjectorView = () => {
       setScreenQr(url);
     });
 
-    const interval = setInterval(() => {
+    const interval = window.setInterval(() => {
       setTickerIndex(prev => (prev + 1) % 4);
     }, 4000);
+    const boardRefresh = window.setInterval(() => {
+      refreshLeaderboard();
+    }, 15000);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      window.clearInterval(interval);
+      window.clearInterval(boardRefresh);
+    };
+  }, [refreshLeaderboard]);
 
-  const allBoard = [...MOCK_ATTENDEES, {
+  const allBoard = leaderboard.some(player => player.id === user.id)
+    ? [...leaderboard]
+    : [...leaderboard, {
     id: user.id,
     name: user.name,
     role: user.role,
     title: currentRank.title,
     points: points,
     avatarId: user.avatarId
-  }].sort((a, b) => b.points - a.points);
+  }];
+  allBoard.sort((a, b) => b.points - a.points);
 
   const top10 = allBoard.slice(0, 10);
 
   const tickerItems = [
     '⚡ LIVE AT SARAU EVENT CENTER · JOS TECHFEST 2026 · THEME: AI X INDUSTRY',
-    '🏆 TOP 10 PLAYERS ADVANCE TO THE STAGE PROMPT BATTLE AT 3:30 PM!',
-    '🤖 10+ PARTNER BOOTHS OPEN FOR AUTOMATION CHALLENGES IN FOYER',
-    '📱 SCAN THE QR CODE ON SCREEN TO JOIN TECHFEST QUEST & CLIMB THE BOARD'
+    '🏆 SCORES ARE VERIFIED AND RECORDED BY THE EVENT SERVER',
+    '🤖 EVENT CHECK-INS REQUIRE AN ACTIVE ORGANIZER-ISSUED QR CODE',
+    '📱 SIGN IN WITH A VERIFIED EMAIL TO JOIN THE TECHFEST QUEST'
   ];
 
   return (
@@ -136,7 +144,7 @@ export const VenueProjectorView = () => {
               SCAN TO JOIN GAME
             </span>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              techfestjos.org/quest
+              {window.location.host}
             </div>
           </div>
         </div>

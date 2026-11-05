@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { MOCK_ATTENDEES } from '../data/mockAttendees';
 import { ROLES, getAvatarMeta } from '../data/avatars';
 import { 
   Search, 
@@ -14,24 +13,20 @@ import {
 } from 'lucide-react';
 
 export const PeopleScreen = () => {
-  const { user, connections, handleQrScan, showToast } = useApp();
+  const { user, attendees, connections, outgoingRequestIds, connectToAttendee } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
 
   const connectedIds = connections.map(c => c.attendeeId);
 
-  const filteredAttendees = MOCK_ATTENDEES.filter(att => {
+  const filteredAttendees = attendees.filter(att => {
     if (att.id === user.id) return false;
     const matchesSearch = att.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          att.bio.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          att.company.toLowerCase().includes(searchQuery.toLowerCase());
+                          (att.bio || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (att.company || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = selectedRole === 'all' || att.role === selectedRole;
     return matchesSearch && matchesRole;
   });
-
-  const handleQuickConnect = (att) => {
-    handleQrScan(att.qrToken);
-  };
 
   return (
     <div className="main-content">
@@ -135,6 +130,7 @@ export const PeopleScreen = () => {
         ) : (
           filteredAttendees.map(att => {
             const isConnected = connectedIds.includes(att.id);
+            const isPending = outgoingRequestIds.includes(att.id);
             const isDiffRole = att.role !== user.role;
             const avatar = getAvatarMeta(att.avatarId);
 
@@ -186,28 +182,10 @@ export const PeopleScreen = () => {
                   {att.bio}
                 </p>
 
-                {/* Interests tags */}
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {att.interests.map((tag, i) => (
-                    <span 
-                      key={i} 
-                      style={{ 
-                        fontSize: '10.5px', 
-                        background: 'rgba(255, 255, 255, 0.05)', 
-                        padding: '2px 8px', 
-                        borderRadius: '4px',
-                        color: 'var(--text-muted)'
-                      }}
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-
                 {/* Connect action */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '8px' }}>
                   <span style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
-                    Token: {att.qrToken}
+                    {att.hubId || 'TechFest attendee'}
                   </span>
 
                   {isConnected ? (
@@ -221,11 +199,13 @@ export const PeopleScreen = () => {
                     }}>
                       <Check size={14} strokeWidth={3} /> Connected
                     </span>
+                  ) : isPending ? (
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Request sent</span>
                   ) : (
                     <button
                       className="pill-btn-action pill-btn-primary"
                       style={{ width: 'auto', padding: '6px 14px', fontSize: '12px' }}
-                      onClick={() => handleQuickConnect(att)}
+                      onClick={() => connectToAttendee(att.id)}
                     >
                       <UserPlus size={13} />
                       <span>Plug In</span>

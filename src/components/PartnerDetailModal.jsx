@@ -1,31 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   X, 
   Building2, 
-  CheckCircle, 
-  Clock, 
-  RotateCw, 
-  Sparkles,
-  MapPin,
   Check,
-  Award
 } from 'lucide-react';
-import QRCode from 'qrcode';
 
 export const PartnerDetailModal = () => {
   const { 
     modalData: partner, 
     setActiveModal, 
     partnerVisits, 
-    setPartnerVisits, 
-    addPoints, 
-    playTone,
-    showToast 
+    completePartnerTask
   } = useApp();
 
-  const [qrDataUrl, setQrDataUrl] = useState('');
-  const [rotatingTimer, setRotatingTimer] = useState(180); // 3 minutes rotating code
   const [selectedTaskOption, setSelectedTaskOption] = useState(null);
   const [taskAnswered, setTaskAnswered] = useState(false);
 
@@ -33,60 +21,18 @@ export const PartnerDetailModal = () => {
 
   const visit = partnerVisits[partner.id] || { scanned: false, taskCompleted: false, points: 0 };
 
-  // Generate rotating QR code with timestamp hash simulation
-  useEffect(() => {
-    const timeSlot = Math.floor(Date.now() / 180000); // 3-min window
-    const signedPayload = `${partner.boothCode}-TS${timeSlot}`;
-
-    QRCode.toDataURL(signedPayload, {
-      width: 200,
-      margin: 1,
-      color: {
-        dark: '#00E676',
-        light: '#0A0E0C'
-      }
-    }).then(url => {
-      setQrDataUrl(url);
-    });
-
-    const interval = setInterval(() => {
-      setRotatingTimer(prev => (prev <= 1 ? 180 : prev - 1));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [partner.boothCode]);
-
-  const handleTaskOption = (idx) => {
+  const handleTaskOption = async (idx) => {
     if (taskAnswered || visit.taskCompleted) return;
-
     setSelectedTaskOption(idx);
     setTaskAnswered(true);
-
-    const isCorrect = idx === partner.task.correctIndex;
-    if (isCorrect) {
-      playTone('points');
-      setPartnerVisits(prev => ({
-        ...prev,
-        [partner.id]: { ...(prev[partner.id] || {}), scanned: true, taskCompleted: true, points: 25 }
-      }));
-
-      addPoints(
-        `partner-task-${partner.id}`,
-        `${partner.name} Challenge Completed`,
-        15,
-        4,
-        `Completed 2-minute booth automation challenge`
-      );
-      showToast('Challenge Cleared!', `+15 pts from ${partner.name}!`, 'success');
-    } else {
-      playTone('error');
-      showToast('Incorrect', 'Review the prompt and try again!', 'warning');
-      setTimeout(() => setTaskAnswered(false), 1200);
+    const accepted = await completePartnerTask(partner.id, idx);
+    if (!accepted) {
+      window.setTimeout(() => {
+        setTaskAnswered(false);
+        setSelectedTaskOption(null);
+      }, 1200);
     }
   };
-
-  const minutesLeft = Math.floor(rotatingTimer / 60);
-  const secondsLeft = rotatingTimer % 60;
 
   return (
     <div className="modal-overlay">
@@ -134,55 +80,20 @@ export const PartnerDetailModal = () => {
             </p>
           </div>
 
-          {/* Rotating QR Display (PRD Q3 & M3) */}
+          {/* Server-verified booth check-in */}
           <div style={{
             background: 'rgba(0, 0, 0, 0.5)',
             border: '1px solid var(--border-subtle)',
             borderRadius: '16px',
             padding: '16px',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            textAlign: 'center',
+            justifyContent: 'space-between',
             gap: '10px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', fontSize: '11.5px' }}>
-              <span style={{ color: 'var(--text-muted)' }}>
-                Booth Screen Live Code
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#00E676', fontWeight: '700' }}>
-                <Clock size={12} />
-                Rotates in {minutesLeft}:{secondsLeft < 10 ? `0${secondsLeft}` : secondsLeft}
-              </span>
-            </div>
-
-            {qrDataUrl && (
-              <div style={{
-                padding: '10px',
-                background: '#0A0E0C',
-                borderRadius: '12px',
-                border: '1px solid rgba(0, 230, 118, 0.3)',
-                boxShadow: '0 0 20px rgba(0, 230, 118, 0.15)'
-              }}>
-                <img 
-                  src={qrDataUrl} 
-                  alt="Rotating Partner QR" 
-                  style={{ width: '150px', height: '150px', display: 'block' }} 
-                />
-              </div>
-            )}
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{
-                fontSize: '11px',
-                fontFamily: 'monospace',
-                background: 'rgba(255, 255, 255, 0.06)',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                color: 'var(--text-muted)'
-              }}>
-                {partner.boothCode}
-              </span>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              Booth check-in
+            </span>
               {visit.scanned && (
                 <span style={{
                   fontSize: '11px',
@@ -195,7 +106,6 @@ export const PartnerDetailModal = () => {
                   <Check size={13} strokeWidth={3} /> Booth Checked In (+10 pts)
                 </span>
               )}
-            </div>
           </div>
 
           {/* 2-Minute Partner Micro Task */}
@@ -235,23 +145,23 @@ export const PartnerDetailModal = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {partner.task.options.map((opt, idx) => {
                 const isSelected = selectedTaskOption === idx;
-                const isDone = visit.taskCompleted && idx === partner.task.correctIndex;
+                const isDone = visit.taskCompleted && isSelected;
 
                 return (
                   <button
                     key={idx}
                     onClick={() => handleTaskOption(idx)}
-                    disabled={visit.taskCompleted}
+                    disabled={visit.taskCompleted || taskAnswered}
                     style={{
                       padding: '12px',
                       borderRadius: '10px',
                       textAlign: 'left',
                       fontSize: '12.5px',
                       cursor: visit.taskCompleted ? 'default' : 'pointer',
-                      border: isDone || (taskAnswered && idx === partner.task.correctIndex)
+                      border: isDone
                         ? '1.5px solid #00E676'
                         : '1px solid rgba(255, 255, 255, 0.08)',
-                      background: isDone || (taskAnswered && idx === partner.task.correctIndex)
+                      background: isDone
                         ? 'rgba(0, 230, 118, 0.15)'
                         : 'rgba(255, 255, 255, 0.03)',
                       color: '#FFF',
@@ -262,9 +172,7 @@ export const PartnerDetailModal = () => {
                     }}
                   >
                     <span>{opt}</span>
-                    {(isDone || (taskAnswered && idx === partner.task.correctIndex)) && (
-                      <CheckCircle size={16} color="#00E676" />
-                    )}
+                    {isDone && <Check size={16} color="#00E676" />}
                   </button>
                 );
               })}

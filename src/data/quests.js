@@ -52,7 +52,7 @@ export const STAGES = [
     title: 'Industry Integration',
     subtitle: 'Partner Automations',
     tagline: '"Plug into the people building the future."',
-    flavor: 'Visit 10+ partner booths at Sarau Hall. Scan rotating booth QRs and conquer 2-minute micro challenges.',
+    flavor: 'Visit partner booths, scan active organizer-issued QRs, and complete server-scored challenges.',
     color: '#FF4081', // Magenta / Neon Pink
     bgGlow: 'rgba(255, 64, 129, 0.15)',
     cap: 150,
@@ -87,23 +87,12 @@ export const INITIAL_STAGE1_QUESTS = [
     completed: false
   },
   {
-    id: 'q-join-wa',
-    title: 'Join Community WhatsApp Channel',
-    actionText: 'Join WhatsApp Channel',
-    targetUrl: 'https://whatsapp.com/channel/jos-techfest',
-    points: 5,
-    rule: 'Self-declared with spot checks',
-    type: 'social_follow',
-    platform: 'WhatsApp',
-    completed: false
-  },
-  {
     id: 'q-post-x',
     title: 'Post about TechFest on X',
     actionText: 'Post on X with #JosTechFest2026',
     prefilledText: 'Excited to attend Jos TechFest 2026 at Sarau Event Center! Theme: AI x Industry. Automating the future of work! #JosTechFest2026 #AIxIndustry @TechFestJos',
     points: 5,
-    rule: 'Paste link to your post (checked for hashtag & tag)',
+    rule: 'Self-reported post URL; organizers can review the linked post.',
     type: 'social_post',
     platform: 'X (Twitter)',
     completed: false,
@@ -115,7 +104,7 @@ export const INITIAL_STAGE1_QUESTS = [
     actionText: 'Post on LinkedIn',
     prefilledText: 'Looking forward to Jos TechFest 2026 at Sarau Event Center! Connecting with builders and exploring AI x Industry. Let us automate the day! #JosTechFest2026 #PlateauInnovates',
     points: 5,
-    rule: 'Paste link to your post (checked for hashtag)',
+    rule: 'Self-reported post URL; organizers can review the linked post.',
     type: 'social_post',
     platform: 'LinkedIn',
     completed: false,
@@ -129,23 +118,5 @@ export const INITIAL_STAGE1_QUESTS = [
     rule: 'Auto-verified on onboarding',
     type: 'profile',
     completed: true // automatically given on onboarding
-  },
-  {
-    id: 'q-newsletter',
-    title: 'Subscribe to TechFest Dispatch',
-    actionText: 'Join mailing list for keynotes',
-    points: 5,
-    rule: 'Auto-verified with your Gmail',
-    type: 'newsletter',
-    completed: false
-  },
-  {
-    id: 'q-share-ref',
-    title: 'Share Your Operator Referral Link',
-    actionText: 'Copy or share your unique pass',
-    points: 5,
-    rule: 'Auto-verified when link is copied/shared',
-    type: 'referral_share',
-    completed: false
   }
 ];

@@ -38,7 +38,7 @@ export const StageDetailModal = () => {
   const handlePostSubmit = (questId) => {
     const url = postInputs[questId] || '';
     if (!url.trim()) {
-      showToast('Paste Post URL', 'Please paste the link to your post to verify.', 'warning');
+      showToast('Paste Post URL', 'Add the public link so organizers can review your post.', 'warning');
       return;
     }
     completeStage1Quest(questId, url);
@@ -217,34 +217,12 @@ export const StageDetailModal = () => {
                             onClick={() => handlePostSubmit(quest.id)}
                           >
                             <Send size={13} />
-                            <span>Verify</span>
+                            <span>Submit Link</span>
                           </button>
                         </div>
                       </div>
                     )}
 
-                    {!isDone && quest.type === 'newsletter' && (
-                      <button
-                        className="pill-btn-action pill-btn-primary"
-                        style={{ marginTop: '4px', fontSize: '12.5px' }}
-                        onClick={() => completeStage1Quest(quest.id)}
-                      >
-                        Subscribe with Gmail
-                      </button>
-                    )}
-
-                    {!isDone && quest.type === 'referral_share' && (
-                      <button
-                        className="pill-btn-action pill-btn-primary"
-                        style={{ marginTop: '4px', fontSize: '12.5px' }}
-                        onClick={() => {
-                          navigator.clipboard?.writeText('https://techfestjos.org/quest');
-                          completeStage1Quest(quest.id);
-                        }}
-                      >
-                        Copy & Share Referral
-                      </button>
-                    )}
                   </div>
                 );
               })}

@@ -29,17 +29,7 @@ export const OperatorCardModal = () => {
   const clearedStages = getClearedStagesCount();
 
   useEffect(() => {
-    const inviteUrl = new URL(window.location.pathname, window.location.origin);
-    inviteUrl.searchParams.set('register', 'true');
-    inviteUrl.searchParams.set('join', JSON.stringify({
-      id: user.id,
-      name: user.name,
-      role: user.role,
-      avatarId: user.avatarId,
-      qrToken: user.qrToken
-    }));
-
-    QRCode.toDataURL(inviteUrl.toString(), {
+    QRCode.toDataURL(`JTF26-ATT-${user.qrToken}`, {
       width: 320,
       margin: 4,
       errorCorrectionLevel: 'H',
@@ -50,9 +40,13 @@ export const OperatorCardModal = () => {
     }).then(setQrDataUrl);
   }, [user.id, user.name, user.role, user.avatarId, user.qrToken]);
 
-  const copyShareLink = () => {
-    navigator.clipboard?.writeText(`https://techfestjos.org/operator/${user.ticketId || 'JTF26'}`);
-    showToast('Operator Link Copied', 'Your verifiable operator pass URL is ready to share!', 'success');
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`JTF26-ATT-${user.qrToken}`);
+      showToast('Attendee code copied', 'Share the code or let another attendee scan your QR.', 'success');
+    } catch (error) {
+      showToast('Could not copy code', 'Your browser blocked clipboard access.', 'warning');
+    }
   };
 
   return (

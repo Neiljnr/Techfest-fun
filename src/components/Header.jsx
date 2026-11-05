@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Star, Wifi, WifiOff, QrCode, Shield, User } from 'lucide-react';
+import { Star, Wifi, WifiOff, QrCode, Shield } from 'lucide-react';
 
 export const Header = () => {
   const {
@@ -9,7 +9,7 @@ export const Header = () => {
     currentRank,
     avatarMeta,
     isOnline,
-    toggleNetwork,
+    isAdmin,
     offlineQueue,
     syncOfflineQueue,
     setActiveModal,
@@ -43,10 +43,11 @@ export const Header = () => {
         {/* Offline / Online simulator badge */}
         <button
           className={`network-badge ${isOnline ? 'online' : 'offline'}`}
-          onClick={isOnline && offlineQueue.length > 0 ? syncOfflineQueue : toggleNetwork}
+          onClick={syncOfflineQueue}
+          disabled={!isOnline || offlineQueue.length === 0}
           title={isOnline
-            ? offlineQueue.length > 0 ? 'Tap to retry queued scans' : 'Tap to simulate weak venue network'
-            : 'Offline mode active: tap to reconnect'}
+            ? offlineQueue.length > 0 ? 'Synchronize saved scans' : 'Internet connection available'
+            : 'Waiting for an internet connection'}
         >
           {isOnline ? (
             <>
@@ -60,6 +61,18 @@ export const Header = () => {
             </>
           )}
         </button>
+
+        {isAdmin && (
+          <button
+            type="button"
+            className="header-icon-btn"
+            onClick={() => setCurrentTab('admin')}
+            title="Organizer admin console"
+            aria-label="Open organizer admin console"
+          >
+            <Shield size={17} />
+          </button>
+        )}
 
         {/* Current Points Pill */}
         <button

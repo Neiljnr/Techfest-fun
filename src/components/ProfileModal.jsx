@@ -1,45 +1,38 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { AVATARS, ROLES, getRoleMeta } from '../data/avatars';
+import { AVATARS } from '../data/avatars';
 import { COMMUNITY_HUBS } from '../data/hubs';
 import { 
   X, 
   User, 
-  Shield, 
   Trash2, 
   Save, 
   Check, 
-  Key,
-  ShieldAlert,
-  Sparkles
+  ShieldAlert
 } from 'lucide-react';
 
 export const ProfileModal = () => {
   const { 
     user, 
-    setUser, 
+    updateProfile,
     setActiveModal, 
     deleteMyData, 
-    showToast 
+    signOut
   } = useApp();
 
   const [name, setName] = useState(user.name);
-  const [role, setRole] = useState(user.role);
   const [avatarId, setAvatarId] = useState(user.avatarId);
   const [hubId, setHubId] = useState(user.hubId);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    setUser(prev => ({
-      ...prev,
-      name: name.trim() || 'Operator',
-      role,
+    const saved = await updateProfile({
+      name: name.trim(),
       avatarId,
       hubId
-    }));
-    showToast('Profile Updated', 'Operator parameters synchronized.', 'success');
-    setActiveModal(null);
+    });
+    if (saved) setActiveModal(null);
   };
 
   return (
@@ -89,41 +82,6 @@ export const ProfileModal = () => {
                 outline: 'none'
               }}
             />
-          </div>
-
-          {/* Role Picker */}
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-light)', display: 'block', marginBottom: '6px' }}>
-              Operator Role (Affects Cross-Role Networking Bonuses)
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {ROLES.map(r => {
-                const isSelected = role === r.id;
-                return (
-                  <button
-                    type="button"
-                    key={r.id}
-                    onClick={() => setRole(r.id)}
-                    style={{
-                      padding: '10px',
-                      borderRadius: '10px',
-                      border: isSelected ? `2px solid ${r.color}` : '1px solid var(--border-subtle)',
-                      background: isSelected ? `${r.color}20` : 'rgba(255, 255, 255, 0.03)',
-                      color: isSelected ? '#FFF' : 'var(--text-muted)',
-                      textAlign: 'left',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div style={{ fontWeight: '800', fontSize: '13px', color: isSelected ? r.color : '#FFF' }}>
-                      {r.name}
-                    </div>
-                    <div style={{ fontSize: '10.5px', marginTop: '2px', opacity: 0.8 }}>
-                      {r.tagline}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           {/* Avatar Selector (12 Illustrated Avatars) */}
@@ -196,7 +154,10 @@ export const ProfileModal = () => {
           {/* Save Button */}
           <button type="submit" className="pill-btn-action pill-btn-primary">
             <Save size={16} />
-            <span>Save Profile Parameters</span>
+            <span>Save Profile</span>
+          </button>
+          <button type="button" className="pill-btn-action pill-btn-secondary" onClick={signOut}>
+            Sign out
           </button>
 
           {/* Privacy & NDPA Data Deletion */}

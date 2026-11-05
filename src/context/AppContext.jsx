@@ -1,991 +1,725 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { STAGES, INITIAL_STAGE1_QUESTS } from '../data/quests';
+import { INITIAL_STAGE1_QUESTS } from '../data/quests';
 import { PARTNERS } from '../data/partners';
-import { SESSIONS } from '../data/sessions';
-import { INITIAL_SIGNAL_DROPS } from '../data/signalDrops';
-import { MOCK_ATTENDEES, FOUNDER_TRACK_ATTENDEES } from '../data/mockAttendees';
-import { COMMUNITY_HUBS, getNormalizedHubScore } from '../data/hubs';
-import { getTitleForPoints, BADGES } from '../data/ranks';
+import { getTitleForPoints } from '../data/ranks';
 import { getAvatarMeta, getRoleMeta } from '../data/avatars';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
-const AppContext = createContext();
+const AppContext = createContext(null);
+const EMPTY_BLITZ = {
+  completed: false,
+  score: 0,
+  correctCount: 0,
+  totalAnswered: 0,
+  speedBonusTotal: 0,
+  completedAt: null
+};
+const OFFLINE_QUEUE_KEY = 'techfest_prod_offline_queue_v1';
 
-const readStorage = (key, fallback) => {
+const readOfflineQueue = () => {
   try {
-    const saved = localStorage.getItem(key);
-    if (saved === null) return fallback;
-    return saved;
-  } catch (e) {
-    return fallback;
+    const stored = localStorage.getItem(OFFLINE_QUEUE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Unable to read the offline scan queue.', error);
+    return [];
   }
 };
 
-const readStoredJson = (key, fallback) => {
-  const saved = readStorage(key, null);
-  if (saved === null) return fallback;
-
+const saveOfflineQueue = (queue) => {
   try {
-    return JSON.parse(saved);
-  } catch (e) {
-    return fallback;
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+  } catch (error) {
+    console.error('Unable to persist the offline scan queue.', error);
+    throw new Error('This device could not save the scan for later synchronization.');
   }
 };
 
-const writeStorage = (key, value) => {
-  try {
-    localStorage.setItem(key, value);
-  } catch (e) {
-    // Storage may be unavailable in private browsing or restricted environments.
-  }
-};
-
-const GUEST_USER = () => ({
-  id: '',
-  name: '',
-  email: '',
-  role: 'builder',
-  avatarId: 'av-1',
-  ticketType: 'free',
-  ticketId: '',
-  hubId: '',
-  city: '',
-  bio: '',
-  qrToken: '',
+const mapProfile = (profile, authUser) => ({
+  id: profile.id,
+  name: profile.name,
+  email: authUser.email || '',
+  role: profile.role,
+  avatarId: profile.avatar_id,
+  ticketType: 'attendee',
+  ticketId: `JTF26-${profile.id.slice(0, 8).toUpperCase()}`,
+  hubId: profile.hub_id,
+  city: 'Jos',
+  bio: profile.bio,
+  company: profile.company,
+  qrToken: profile.qr_token,
   isCheckedIn: false,
-  isOnboarded: false,
-  hideFromPublicBoard: false
+  isOnboarded: true,
+  hideFromPublicBoard: profile.hide_from_public_board
 });
 
-const isDemoAccount = (profile) => {
-  if (!profile) return false;
-  const demoEmails = ['keziah.pam@gmail.com'];
-  return (
-    profile.id === 'op-neil-92' ||
-    profile.name === 'Keziah Pam' ||
-    demoEmails.includes(String(profile.email || '').toLowerCase())
+const mapLedgerEntry = (entry) => ({
+  id: entry.id,
+  questId: entry.event_key,
+  title: entry.title,
+  points: entry.points,
+  stage: entry.stage,
+  timestamp: new Date(entry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  reason: entry.reason,
+  isReversed: Boolean(entry.reversed_at),
+  reversalReason: entry.reversal_reason,
+  attendeeName: entry.attendee_name,
+  attendeeRole: entry.attendee_role
+});
+
+const mapConnection = (row, userId, userRole, ownLedger) => {
+  const isRequester = row.requester_id === userId;
+  const attendeeId = isRequester ? row.recipient_id : row.requester_id;
+  const awardedEntry = ownLedger.find(entry =>
+    entry.questId === `connection:${attendeeId}` && !entry.isReversed
   );
+  return {
+    id: row.id,
+    attendeeId,
+    name: isRequester ? row.recipient_name : row.requester_name,
+    role: isRequester ? row.recipient_role : row.requester_role,
+    avatarId: isRequester ? row.recipient_avatar_id : row.requester_avatar_id,
+    status: row.status,
+    isDifferentRole: (isRequester ? row.recipient_role : row.requester_role) !== userRole,
+    pointsAwarded: awardedEntry?.points || 0,
+    confirmedAt: row.confirmed_at
+      ? new Date(row.confirmed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : null
+  };
 };
 
-const clearDemoStorage = () => {
-  try {
-    const keys = [
-      'techfest_user',
-      'techfest_points',
-      'techfest_ledger',
-      'techfest_stage1',
-      'techfest_connections',
-      'techfest_blitz',
-      'techfest_partners',
-      'techfest_sessions',
-      'techfest_drops',
-      'techfest_roundtable_checkin',
-      'techfest_offline_queue',
-      'techfest_visitor_name'
-    ];
-    keys.forEach(key => localStorage.removeItem(key));
-  } catch (e) {
-    // ignore storage restrictions
-  }
-};
-
-const isValidInvite = (profile) => (
-  profile &&
-  typeof profile.id === 'string' &&
-  typeof profile.name === 'string' &&
-  typeof profile.role === 'string'
-);
-
-const getInviteFromCode = (rawCode, currentUser) => {
-  const code = String(rawCode || '').trim();
-
-  try {
-    const joinData = new URL(code).searchParams.get('join');
-    if (joinData) {
-      const profile = JSON.parse(joinData);
-      if (isValidInvite(profile)) return profile;
-    }
-  } catch (e) {
-    // Not an invite URL; try a regular attendee token below.
-  }
-
-  const attendee = MOCK_ATTENDEES.find(profile => profile.qrToken === code);
-  if (attendee) return attendee;
-  if (currentUser.qrToken === code) return currentUser;
-  return null;
-};
-
-// Simple Web Audio API sound generator for snappy feedback
 const playTone = (type) => {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    const now = ctx.currentTime;
-    if (type === 'scan') {
-      osc.frequency.setValueAtTime(587.33, now); // D5
-      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12); // A5
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-      osc.start(now);
-      osc.stop(now + 0.15);
-    } else if (type === 'points') {
-      osc.frequency.setValueAtTime(523.25, now); // C5
-      osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
-      osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
-      osc.start(now);
-      osc.stop(now + 0.28);
-    } else if (type === 'stage_clear') {
-      // Fanfare
-      [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.connect(g);
-        g.connect(ctx.destination);
-        o.frequency.value = freq;
-        g.gain.setValueAtTime(0.15, now + i * 0.1);
-        g.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.25);
-        o.start(now + i * 0.1);
-        o.stop(now + i * 0.1 + 0.25);
-      });
-    } else if (type === 'error') {
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(150, now);
-      osc.frequency.linearRampToValueAtTime(80, now + 0.2);
+    const context = new AudioContext();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    const now = context.currentTime;
+    if (type === 'error') {
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.setValueAtTime(150, now);
+      oscillator.frequency.linearRampToValueAtTime(80, now + 0.2);
       gain.gain.setValueAtTime(0.25, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-      osc.start(now);
-      osc.stop(now + 0.2);
+      oscillator.start(now);
+      oscillator.stop(now + 0.2);
+      return;
     }
-  } catch (e) {
-    // Audio context may be restricted before user gesture
+    oscillator.frequency.setValueAtTime(type === 'scan' ? 587.33 : 659.25, now);
+    oscillator.frequency.setValueAtTime(type === 'scan' ? 880 : 783.99, now + 0.1);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+    oscillator.start(now);
+    oscillator.stop(now + 0.25);
+  } catch (error) {
+    console.warn('Audio feedback is unavailable.', error);
   }
 };
 
 export const AppProvider = ({ children }) => {
-  // Persistent state initialized from localStorage
-  const [user, setUser] = useState(() => {
-    const savedUser = readStoredJson('techfest_user', null);
-    if (savedUser && isDemoAccount(savedUser)) {
-      clearDemoStorage();
-      return GUEST_USER();
-    }
-    if (savedUser && typeof savedUser.name === 'string' && typeof savedUser.email === 'string') {
-      return savedUser;
-    }
-    return GUEST_USER();
-  });
-
-  const [points, setPoints] = useState(() => {
-    const saved = readStorage('techfest_points', null);
-    return saved !== null ? parseInt(saved, 10) : 0;
-  });
-
-  const [ledger, setLedger] = useState(() => {
-    const savedLedger = readStoredJson('techfest_ledger', null);
-    if (savedLedger) {
-      return savedLedger;
-    }
-    return [];
-  });
-
-  const [stage1Quests, setStage1Quests] = useState(() => {
-    const savedStage1 = readStoredJson('techfest_stage1', null);
-    if (savedStage1) {
-      return savedStage1;
-    }
-    return INITIAL_STAGE1_QUESTS;
-  });
-
-  // Stage 2: People connections
-  const [connections, setConnections] = useState(() => {
-    const savedConnections = readStoredJson('techfest_connections', null);
-    if (savedConnections) {
-      return savedConnections;
-    }
-    return [];
-  });
-
-  // Incoming 2-way pending handshake requests
+  const [session, setSession] = useState(null);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [backendError, setBackendError] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [points, setPoints] = useState(0);
+  const [ledger, setLedger] = useState([]);
+  const [adminLedger, setAdminLedger] = useState([]);
+  const [stage1Quests, setStage1Quests] = useState(INITIAL_STAGE1_QUESTS);
+  const [connections, setConnections] = useState([]);
   const [pendingHandshakes, setPendingHandshakes] = useState([]);
-  const [roundtableCheckedIn, setRoundtableCheckedIn] = useState(
-    () => {
-      if (readStorage('techfest_roundtable_checkin', 'false') === 'true') return true;
-      const savedLedger = readStoredJson('techfest_ledger', []);
-      return Array.isArray(savedLedger) && savedLedger.some(
-        entry => entry.questId === 'day2-roundtable-1'
-      );
-    }
-  );
-  const roundtableCheckedInRef = useRef(roundtableCheckedIn);
-
-  // Stage 3: Prompt Blitz status
-  const [blitzState, setBlitzState] = useState(() => {
-    const savedBlitz = readStoredJson('techfest_blitz', null);
-    if (savedBlitz) {
-      return savedBlitz;
-    }
-    return {
-      completed: false,
-      score: 0,
-      correctCount: 0,
-      totalAnswered: 0,
-      speedBonusTotal: 0,
-      completedAt: null
-    };
-  });
-
-  // Stage 4: Partner visits
-  const [partnerVisits, setPartnerVisits] = useState(() => {
-    const savedPartnerVisits = readStoredJson('techfest_partners', null);
-    if (savedPartnerVisits) {
-      return savedPartnerVisits;
-    }
-    return {};
-  });
-
-  // Keynote Capture sessions
-  const [capturedSessions, setCapturedSessions] = useState(() => {
-    const savedSessions = readStoredJson('techfest_sessions', null);
-    if (savedSessions) {
-      return savedSessions;
-    }
-    return [];
-  });
-
-  // Signal Drops claimed
-  const [claimedDrops, setClaimedDrops] = useState(() => {
-    const savedDrops = readStoredJson('techfest_drops', null);
-    if (savedDrops) {
-      return savedDrops;
-    }
-    return [];
-  });
-
-  // Signal Drops catalog (Admin can add new)
-  const signalDrops = INITIAL_SIGNAL_DROPS;
-
-  // Network simulation & Offline scan queue
-  const [isOnline, setIsOnline] = useState(true);
-  const [offlineQueue, setOfflineQueue] = useState(
-    () => readStoredJson('techfest_offline_queue', [])
-  );
+  const [outgoingRequestIds, setOutgoingRequestIds] = useState([]);
+  const [blitzState, setBlitzState] = useState(EMPTY_BLITZ);
+  const [partnerVisits, setPartnerVisits] = useState({});
+  const [capturedSessions, setCapturedSessions] = useState([]);
+  const [claimedDrops, setClaimedDrops] = useState([]);
+  const [attendees, setAttendees] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [signalDrops, setSignalDrops] = useState([]);
+  const [staffEventCodes, setStaffEventCodes] = useState([]);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [offlineQueue, setOfflineQueue] = useState(readOfflineQueue);
   const [toastMessage, setToastMessage] = useState(null);
-
-  // Navigation & Modals
-  const [currentTab, setCurrentTab] = useState('home'); // 'home', 'people', 'plug', 'board', 'venue'
-  const [activeModal, setActiveModal] = useState(null); // 'scanner', 'stage_detail', 'blitz', 'partner_detail', 'operator_card', 'privacy', 'profile'
+  const [currentTab, setCurrentTab] = useState('home');
+  const [activeModal, setActiveModal] = useState(null);
   const [modalData, setModalData] = useState(null);
-  const [signupMode, setSignupMode] = useState(false);
+  const [signupMode, setSignupMode] = useState(true);
   const [signupInvite, setSignupInvite] = useState(null);
 
-  // Sync to localStorage
-  useEffect(() => {
-    writeStorage('techfest_user', JSON.stringify(user));
-  }, [user]);
+  const showToast = (title, message, type = 'success') => {
+    setToastMessage({ title, message, type });
+    window.setTimeout(() => setToastMessage(null), 4500);
+  };
 
-  useEffect(() => {
-    writeStorage('techfest_points', points.toString());
-  }, [points]);
+  const showError = (title, error) => {
+    console.error(title, error);
+    showToast(title, error?.message || 'The request could not be completed. Please try again.', 'error');
+  };
 
-  useEffect(() => {
-    writeStorage('techfest_ledger', JSON.stringify(ledger));
-  }, [ledger]);
-
-  useEffect(() => {
-    writeStorage('techfest_stage1', JSON.stringify(stage1Quests));
-  }, [stage1Quests]);
-
-  useEffect(() => {
-    writeStorage('techfest_connections', JSON.stringify(connections));
-  }, [connections]);
-
-  useEffect(() => {
-    writeStorage('techfest_blitz', JSON.stringify(blitzState));
-  }, [blitzState]);
-
-  useEffect(() => {
-    writeStorage('techfest_partners', JSON.stringify(partnerVisits));
-  }, [partnerVisits]);
-
-  useEffect(() => {
-    writeStorage('techfest_sessions', JSON.stringify(capturedSessions));
-  }, [capturedSessions]);
-
-  useEffect(() => {
-    writeStorage('techfest_drops', JSON.stringify(claimedDrops));
-  }, [claimedDrops]);
-
-  useEffect(() => {
-    writeStorage('techfest_offline_queue', JSON.stringify(offlineQueue));
-  }, [offlineQueue]);
-
-  useEffect(() => {
-    const joinData = new URLSearchParams(window.location.search).get('join');
-    if (!joinData) return;
-
+  const refreshData = async (authUser = session?.user) => {
+    if (!isSupabaseConfigured || !authUser) return;
+    setDataLoading(true);
+    setBackendError('');
     try {
-      const profile = JSON.parse(joinData);
-      if (!isValidInvite(profile)) {
-        throw new Error('The invite QR does not contain a valid operator profile.');
-      }
+      const [profileResult, stateResult, ledgerResult, connectionsResult,
+        attendeesResult, boardResult, catalogResult, accessResult] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', authUser.id).single(),
+        supabase.from('participant_state').select('*').eq('user_id', authUser.id).single(),
+        supabase.from('point_ledger').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false }),
+        supabase.from('my_connections').select('*').order('created_at', { ascending: false }),
+        supabase.from('attendee_directory').select('*').order('name'),
+        supabase.from('leaderboard').select('*').order('points', { ascending: false }),
+        supabase.from('active_event_catalog').select('*').order('title'),
+        supabase.rpc('get_event_access')
+      ]);
+      const results = [profileResult, stateResult, ledgerResult, connectionsResult,
+        attendeesResult, boardResult, catalogResult, accessResult];
+      const failed = results.find(result => result.error);
+      if (failed) throw failed.error;
 
-      if (user && user.email && user.isOnboarded) {
-        handleQrScan(window.location.href);
+      const currentUser = mapProfile(profileResult.data, authUser);
+      const ownLedger = ledgerResult.data.map(mapLedgerEntry);
+      const totalPoints = ownLedger
+        .filter(entry => !entry.isReversed && !entry.title.startsWith('Reversal:'))
+        .reduce((sum, entry) => sum + entry.points, 0);
+      const staff = Boolean(accessResult.data?.is_staff);
+      const connectionRows = connectionsResult.data;
+      const confirmed = connectionRows
+        .filter(row => row.status === 'confirmed')
+        .map(row => mapConnection(row, authUser.id, currentUser.role, ownLedger));
+      const incoming = connectionRows
+        .filter(row => row.status === 'pending' && row.recipient_id === authUser.id)
+        .map(row => ({
+          id: row.id,
+          senderId: row.requester_id,
+          name: row.requester_name,
+          role: row.requester_role,
+          avatarId: row.requester_avatar_id
+        }));
+      const outgoingIds = connectionRows
+        .filter(row => row.status === 'pending' && row.requester_id === authUser.id)
+        .map(row => row.recipient_id);
+      const questRows = INITIAL_STAGE1_QUESTS.map(quest => ({
+        ...quest,
+        completed: ownLedger.some(entry =>
+          entry.questId === (quest.id === 'q-profile' ? 'profile-created' : quest.id)
+        )
+      }));
+      const state = stateResult.data;
+      const boardRows = boardResult.data.map(row => ({
+        id: row.id,
+        name: row.name,
+        role: row.role,
+        avatarId: row.avatar_id,
+        hubId: row.hub_id,
+        points: row.points
+      }));
+      const directoryRows = attendeesResult.data.map(row => ({
+        id: row.id,
+        name: row.name,
+        role: row.role,
+        avatarId: row.avatar_id,
+        hubId: row.hub_id,
+        bio: row.bio,
+        company: row.company,
+        title: row.company || row.role
+      }));
+      const drops = catalogResult.data
+        .filter(item => item.kind === 'signal')
+        .map(item => ({ ...item, active: true }));
+
+      setUser(currentUser);
+      setLedger(ownLedger);
+      setPoints(totalPoints);
+      setStage1Quests(questRows);
+      setConnections(confirmed);
+      setPendingHandshakes(incoming);
+      setOutgoingRequestIds(outgoingIds);
+      setBlitzState(state.blitz_state || EMPTY_BLITZ);
+      setPartnerVisits(state.partner_visits || {});
+      setCapturedSessions(state.captured_sessions || []);
+      setClaimedDrops(state.claimed_drops || []);
+      setAttendees(directoryRows);
+      setLeaderboard(boardRows);
+      setSignalDrops(drops);
+      setIsAdmin(staff);
+
+      if (staff) {
+        const [staffLedgerResult, eventCodesResult] = await Promise.all([
+          supabase.from('staff_ledger').select('*').order('created_at', { ascending: false }).limit(200),
+          supabase.from('staff_event_codes').select('*').order('created_at', { ascending: false })
+        ]);
+        if (staffLedgerResult.error) throw staffLedgerResult.error;
+        if (eventCodesResult.error) throw eventCodesResult.error;
+        setAdminLedger(staffLedgerResult.data.map(mapLedgerEntry));
+        setStaffEventCodes(eventCodesResult.data);
       } else {
-        setSignupInvite(profile);
-        setSignupMode(true);
-        setActiveModal('signup');
+        setAdminLedger([]);
+        setStaffEventCodes([]);
       }
-      window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
     } catch (error) {
-      showToast('Invite Link Invalid', error.message, 'error');
+      setBackendError(error.message || 'Could not load your account data.');
+      throw error;
+    } finally {
+      setDataLoading(false);
     }
+  };
+
+  const refreshLeaderboard = async () => {
+    const { data, error } = await supabase.from('leaderboard').select('*').order('points', { ascending: false });
+    if (error) {
+      showError('Leaderboard could not refresh', error);
+      return;
+    }
+    setLeaderboard(data.map(row => ({
+      id: row.id,
+      name: row.name,
+      role: row.role,
+      avatarId: row.avatar_id,
+      hubId: row.hub_id,
+      points: row.points
+    })));
+  };
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setAuthLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (active) setSession(nextSession);
+    });
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!active) return;
+      if (error) showError('Could not restore sign-in', error);
+      setSession(data?.session || null);
+      setAuthLoading(false);
+    });
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   useEffect(() => {
-    if (!user || !user.email || !user.isOnboarded) {
-      setActiveModal('signup');
-      setCurrentTab('home');
+    if (!session?.user) {
+      setUser(null);
+      setDataLoading(false);
+      setIsAdmin(false);
+      return;
     }
-  }, [user.email, user.isOnboarded]);
+    refreshData(session.user).catch(error => showError('Account data unavailable', error));
+  }, [session?.user?.id]);
 
-  // Toast auto-clear
-  const showToast = (title, message, type = 'success') => {
-    setToastMessage({ title, message, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4500);
+  useEffect(() => {
+    if (!session?.user) return undefined;
+    const interval = window.setInterval(() => {
+      refreshLeaderboard();
+    }, 30000);
+    return () => window.clearInterval(interval);
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    try {
+      saveOfflineQueue(offlineQueue);
+    } catch (error) {
+      showError('Offline scan was not saved', error);
+    }
+  }, [offlineQueue]);
+
+  const sendLoginCode = async ({ name, email, role, createAccount }) => {
+    if (!isSupabaseConfigured) {
+      showToast('Backend setup required', 'Add the Supabase project URL and anon key to the environment before signing in.', 'error');
+      return false;
+    }
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const options = createAccount
+      ? { shouldCreateUser: true, data: { name: String(name || '').trim(), role } }
+      : { shouldCreateUser: false };
+    const { error } = await supabase.auth.signInWithOtp({ email: normalizedEmail, options });
+    if (error) {
+      showError('Could not send verification code', error);
+      return false;
+    }
+    showToast('Check your email', `A one-time sign-in code was sent to ${normalizedEmail}.`, 'success');
+    return true;
   };
 
-  // Add points to ledger
-  const addPoints = (questId, title, pts, stageNumber, reason) => {
-    const newEntry = {
-      id: `led-${Date.now()}`,
-      questId,
-      title,
-      points: pts,
-      stage: stageNumber,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      reason: reason || 'Quest completion',
-      isReversed: false
-    };
+  const verifyLoginCode = async (email, token) => {
+    const { error } = await supabase.auth.verifyOtp({
+      email: String(email || '').trim().toLowerCase(),
+      token: String(token || '').trim(),
+      type: 'email'
+    });
+    if (error) {
+      showError('Verification failed', error);
+      return false;
+    }
+    return true;
+  };
 
-    setPoints(prev => prev + pts);
-    setLedger(prev => [newEntry, ...prev]);
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      showError('Could not sign out', error);
+      return false;
+    }
+    setCurrentTab('home');
+    setActiveModal(null);
+    return true;
+  };
+
+  const updateProfile = async (updates) => {
+    if (!user) return false;
+    const { error } = await supabase.from('profiles').update({
+      name: updates.name,
+      avatar_id: updates.avatarId,
+      hub_id: updates.hubId,
+      bio: updates.bio ?? user.bio,
+      company: updates.company ?? user.company,
+      hide_from_public_board: updates.hideFromPublicBoard ?? user.hideFromPublicBoard
+    }).eq('id', user.id);
+    if (error) {
+      showError('Profile could not be saved', error);
+      return false;
+    }
+    await refreshData();
+    showToast('Profile updated', 'Your account changes are synced.', 'success');
+    return true;
+  };
+
+  const deleteMyData = async () => {
+    const { error } = await supabase.rpc('delete_my_account');
+    if (error) {
+      showError('Account deletion failed', error);
+      return false;
+    }
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) {
+      showError('Account deleted, but sign-out failed', signOutError);
+      return false;
+    }
+    setActiveModal(null);
+    showToast('Account deleted', 'Your profile, connections, and score history have been removed.', 'info');
+    return true;
+  };
+
+  const completeStage1Quest = async (questId, inputUrl = '') => {
+    if (stage1Quests.find(quest => quest.id === questId)?.completed) return false;
+    const { error } = await supabase.rpc('complete_stage_quest', {
+      p_quest_id: questId,
+      p_input_url: inputUrl
+    });
+    if (error) {
+      showError('Quest could not be completed', error);
+      return false;
+    }
+    await refreshData();
     playTone('points');
-
-    showToast(`+${pts} Points!`, `${title} — You dey move!`, 'success');
+    showToast('Quest completed', 'Your points were recorded by the event server.', 'success');
+    return true;
   };
 
-  // Check stage clear status
-  // Stage 1: 25+ pts from Stage 1 quests
-  // Stage 2: 5+ confirmed connections
-  // Stage 3: Blitz completed with 5+ correct
-  // Stage 4: 3+ partner booths visited
+  const confirmHandshake = async (handshakeId) => {
+    const { error } = await supabase.rpc('confirm_connection', { p_connection_id: handshakeId });
+    if (error) {
+      showError('Connection could not be confirmed', error);
+      return false;
+    }
+    await refreshData();
+    playTone('points');
+    return true;
+  };
+
+  const connectToAttendee = async (attendeeId) => {
+    const { error } = await supabase.rpc('request_connection_by_id', { p_profile_id: attendeeId });
+    if (error) {
+      showError('Connection request failed', error);
+      return false;
+    }
+    await refreshData();
+    showToast('Request sent', 'The attendee must accept before points are awarded.', 'success');
+    return true;
+  };
+
+  const completePartnerTask = async (partnerId, answer) => {
+    const { data, error } = await supabase.rpc('complete_partner_task', {
+      p_partner_id: partnerId,
+      p_answer: answer
+    });
+    if (error) {
+      showError('Challenge could not be submitted', error);
+      return false;
+    }
+    if (!data?.correct) {
+      playTone('error');
+      showToast('Incorrect answer', 'Try again. The event server checks each answer.', 'warning');
+      return false;
+    }
+    await refreshData();
+    playTone('points');
+    showToast('Challenge cleared', 'Your points were recorded by the event server.', 'success');
+    return true;
+  };
+
+  const submitPromptBlitz = async (answers) => {
+    const { data, error } = await supabase.rpc('submit_prompt_blitz', { p_answers: answers });
+    if (error) {
+      showError('Quiz could not be submitted', error);
+      return null;
+    }
+    await refreshData();
+    return data;
+  };
+
+  const handleQrScan = async (rawCode, isSyncingOffline = false) => {
+    const code = String(rawCode || '').trim();
+    if (!code) return { success: false, reason: 'Empty code' };
+    playTone('scan');
+
+    if (!user) {
+      showToast('Sign in to scan', 'Verify your email before recording event activity.', 'warning');
+      return { success: false, reason: 'Authentication required' };
+    }
+
+    if (!navigator.onLine && !isSyncingOffline) {
+      const queueItem = { id: crypto.randomUUID(), code, createdAt: new Date().toISOString() };
+      setOfflineQueue(previous => (
+        previous.some(item => item.code === code) ? previous : [...previous, queueItem]
+      ));
+      showToast('Scan saved offline', 'It will be submitted when the connection returns.', 'info');
+      return { success: true, offline: true };
+    }
+
+    const attendeeToken = code.match(/^JTF26-ATT-([0-9a-f-]{36})$/i);
+    try {
+      if (attendeeToken) {
+        const { data, error } = await supabase.rpc('request_connection', {
+          p_qr_token: attendeeToken[1]
+        });
+        if (error) throw error;
+        await refreshData();
+        showToast('Connection request sent', `Waiting for ${data.name} to accept.`, 'success');
+        return { success: true, type: 'attendee', name: data.name };
+      }
+
+      const { data, error } = await supabase.rpc('claim_event_code', { p_code: code });
+      if (error) {
+        if (/already claimed/i.test(error.message)) {
+          await refreshData();
+          return { success: true, alreadyProcessed: true };
+        }
+        throw error;
+      }
+      await refreshData();
+      playTone('points');
+      showToast(`+${data.points} points`, data.title, 'success');
+      if (data.kind === 'partner') {
+        const partner = PARTNERS.find(item => item.id === data.event_id);
+        if (partner) {
+          setModalData(partner);
+          setActiveModal('partner_detail');
+        }
+      }
+      return { success: true, type: data.kind, ...data };
+    } catch (error) {
+      if (isSyncingOffline && /already exists/i.test(error.message || '')) {
+        return { success: true, alreadyProcessed: true };
+      }
+      showError('QR scan rejected', error);
+      return { success: false, reason: error.message };
+    }
+  };
+
+  const syncOfflineQueue = async () => {
+    if (!navigator.onLine) {
+      showToast('No connection', 'Connect to the internet before syncing saved scans.', 'warning');
+      return;
+    }
+    const failed = [];
+    for (const item of offlineQueue) {
+      const result = await handleQrScan(item.code, true);
+      if (!result.success || result.offline) failed.push(item);
+    }
+    setOfflineQueue(failed);
+    if (failed.length) {
+      showToast('Some scans need attention', `${failed.length} scan(s) could not be synchronized.`, 'warning');
+    } else {
+      showToast('Scans synchronized', 'All saved scans were submitted to the event server.', 'success');
+    }
+  };
+
+  const createEventCode = async ({
+    kind, eventId, title, points: eventPoints, stage, description = '',
+    hint = '', claimLimit = null, correctAnswer = 0, expirationMinutes = 10
+  }) => {
+    const { data, error } = await supabase.rpc('staff_create_event_code', {
+      p_kind: kind,
+      p_event_id: eventId,
+      p_title: title,
+      p_points: eventPoints,
+      p_stage: stage,
+      p_description: description,
+      p_hint: hint,
+      p_claim_limit: claimLimit,
+      p_correct_answer: correctAnswer,
+      p_expiration_minutes: expirationMinutes
+    });
+    if (error) {
+      showError('Event QR could not be created', error);
+      return null;
+    }
+    await refreshData();
+    showToast('Event QR created', `The organizer-issued QR expires in ${expirationMinutes} minutes.`, 'success');
+    return data;
+  };
+
+  const triggerNewSignalDrop = ({ title, points: dropPoints, hint }) => createEventCode({
+    kind: 'signal',
+    eventId: `drop-${crypto.randomUUID()}`,
+    title,
+    points: dropPoints,
+    stage: 2,
+    description: hint || '',
+    hint: hint || ''
+  });
+
+  const reverseLedgerEntry = async (ledgerId, reason) => {
+    const { error } = await supabase.rpc('staff_reverse_points', {
+      p_ledger_id: ledgerId,
+      p_reason: reason
+    });
+    if (error) {
+      showError('Ledger reversal failed', error);
+      return false;
+    }
+    await refreshData();
+    showToast('Ledger entry reversed', 'The reversal and reason were added to the audit ledger.', 'success');
+    return true;
+  };
+
   const getStageProgress = (stageNumber) => {
     if (stageNumber === 1) {
-      const stage1Pts = ledger
-        .filter(entry => entry.stage === 1 && !entry.isReversed)
-        .reduce((sum, item) => sum + item.points, 0);
-      const isCleared = stage1Pts >= 25;
+      const value = ledger.filter(entry => entry.stage === 1 && !entry.isReversed)
+        .reduce((sum, entry) => sum + entry.points, 0);
       return {
-        points: Math.min(stage1Pts, 40),
-        cap: 40,
-        threshold: 25,
-        isCleared,
-        progressLabel: `${Math.min(stage1Pts, 40)}/40 pts (Needs 25 to clear)`
+        points: Math.min(value, 40), cap: 40, threshold: 25, isCleared: value >= 25,
+        progressLabel: `${Math.min(value, 40)}/40 pts (Needs 25 to clear)`
       };
     }
     if (stageNumber === 2) {
-      const count = connections.length;
-      const stage2Pts = ledger
-        .filter(entry => entry.stage === 2 && !entry.isReversed)
-        .reduce((sum, item) => sum + item.points, 0);
-      const isCleared = count >= 5;
+      const value = ledger.filter(entry => entry.stage === 2 && !entry.isReversed)
+        .reduce((sum, entry) => sum + entry.points, 0);
       return {
-        points: Math.min(stage2Pts, 200),
-        cap: 200,
-        threshold: 5,
-        count,
-        isCleared,
-        progressLabel: `${count}/5 connections confirmed`
+        points: Math.min(value, 200), cap: 200, threshold: 5, count: connections.length,
+        isCleared: connections.length >= 5,
+        progressLabel: `${connections.length}/5 connections confirmed`
       };
     }
     if (stageNumber === 3) {
-      const isCleared = blitzState.completed && blitzState.correctCount >= 5;
       return {
-        points: blitzState.score,
-        cap: 150,
-        threshold: 5,
-        count: blitzState.correctCount,
-        isCleared,
+        points: blitzState.score, cap: 150, threshold: 5, count: blitzState.correctCount,
+        isCleared: blitzState.completed && blitzState.correctCount >= 5,
         progressLabel: blitzState.completed
           ? `${blitzState.correctCount}/10 correct (${blitzState.score} pts)`
-          : 'Blitz opens mid-event'
+          : 'Complete the event quiz'
       };
     }
     if (stageNumber === 4) {
-      const visitedCount = Object.keys(partnerVisits).length;
-      const stage4Pts = ledger
-        .filter(entry => entry.stage === 4 && !entry.isReversed)
-        .reduce((sum, item) => sum + item.points, 0);
-      const isCleared = visitedCount >= 3;
+      const count = Object.values(partnerVisits).filter(visit => visit.scanned).length;
+      const value = ledger.filter(entry => entry.stage === 4 && !entry.isReversed)
+        .reduce((sum, entry) => sum + entry.points, 0);
       return {
-        points: Math.min(stage4Pts, 150),
-        cap: 150,
-        threshold: 3,
-        count: visitedCount,
-        isCleared,
-        progressLabel: `${visitedCount}/3 partners visited`
+        points: Math.min(value, 150), cap: 150, threshold: 3, count,
+        isCleared: count >= 3, progressLabel: `${count}/3 partner booths visited`
       };
     }
     return { points: 0, cap: 100, threshold: 0, isCleared: false };
   };
 
-  const getClearedStagesCount = () => {
-    let cleared = 0;
-    if (getStageProgress(1).isCleared) cleared++;
-    if (getStageProgress(2).isCleared) cleared++;
-    if (getStageProgress(3).isCleared) cleared++;
-    if (getStageProgress(4).isCleared) cleared++;
-    return cleared;
-  };
-
-  // Complete a Stage 1 quest
-  const completeStage1Quest = (questId, inputUrl = '') => {
-    const quest = stage1Quests.find(q => q.id === questId);
-    if (!quest || quest.completed) return;
-
-    setStage1Quests(prev =>
-      prev.map(q => q.id === questId ? { ...q, completed: true, inputUrl } : q)
-    );
-
-    addPoints(quest.id, quest.title, quest.points, 1, `Stage 1 task: ${quest.platform || quest.title}`);
-
-    // Check if this clears Stage 1
-    const currentPts = ledger.filter(e => e.stage === 1 && !e.isReversed).reduce((s, i) => s + i.points, 0);
-    if (currentPts + quest.points >= 25 && currentPts < 25) {
-      playTone('stage_clear');
-      confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-      showToast('Stage 1 Cleared!', 'Stage 1 Boot Up cleared. You dey move!', 'success');
-    }
-  };
-
-  // Confirm incoming 2-way handshake
-  const confirmHandshake = (handshakeId) => {
-    const handshake = pendingHandshakes.find(h => h.id === handshakeId);
-    if (!handshake) return;
-
-    const isDiff = handshake.role !== user.role;
-    const pts = isDiff ? 15 : 10; // 10 connection + 5 role bonus
-
-    const newConn = {
-      id: `conn-${Date.now()}`,
-      attendeeId: handshake.senderId,
-      name: handshake.name,
-      role: handshake.role,
-      avatarId: handshake.avatarId,
-      isDifferentRole: isDiff,
-      pointsAwarded: pts,
-      confirmedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    setConnections(prev => [newConn, ...prev]);
-    setPendingHandshakes(prev => prev.filter(h => h.id !== handshakeId));
-
-    addPoints(
-      `conn-${handshake.senderId}`,
-      `Two-Way Connect with ${handshake.name}`,
-      pts,
-      2,
-      isDiff ? `Connection (+10) & Different Role Bonus (+5 for ${handshake.role} ↔ ${user.role})` : 'Connection (+10)'
-    );
-
-    if (connections.length + 1 >= 5 && connections.length < 5) {
-      playTone('stage_clear');
-      confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
-      showToast('Stage 2 Cleared!', 'Stage 2: Plug In cleared. 5 human connections unlocked!', 'success');
-    }
-  };
-
-  // Process a QR code scan
-  const handleQrScan = (rawCode, isSyncingOffline = false) => {
-    playTone('scan');
-
-    const isGuestUser = !user || !user.email || !user.isOnboarded;
-
-    if (isGuestUser) {
-      const invite = getInviteFromCode(rawCode, user);
-      if (invite) {
-        setSignupInvite(invite);
-        setSignupMode(true);
-        setActiveModal('signup');
-        showToast('Register to continue', `${invite.name} invited you. Complete signup to unlock access.`, 'info');
-        return { success: true, type: 'registration_required', name: invite.name };
-      }
-
-      setSignupMode(true);
-      setActiveModal('signup');
-      showToast('Create your account', 'Scan a badge and register to use TechFest Quest.', 'info');
-      return { success: true, type: 'register_first' };
-    }
-
-    if (signupMode) {
-      const invite = getInviteFromCode(rawCode, user);
-      if (!invite) {
-        playTone('error');
-        showToast('Operator QR Not Recognized', 'Scan a TechFest operator badge QR to continue account setup.', 'warning');
-        return { success: false, reason: 'Operator QR not recognized' };
-      }
-      setSignupInvite(invite);
-      setActiveModal('signup');
-      return { success: true, type: 'signup_invite', name: invite.name };
-    }
-
-    // If offline, queue the scan!
-    if (!isOnline && !isSyncingOffline) {
-      const queueItem = {
-        id: `offline-${Date.now()}`,
-        code: rawCode,
-        timestamp: new Date().toLocaleTimeString()
-      };
-      setOfflineQueue(prev => (
-        prev.some(item => item.code === rawCode) ? prev : [...prev, queueItem]
-      ));
-      showToast(
-        'Offline Scan Saved!',
-        'No network, no wahala. We saved it offline & will sync when you are back.',
-        'info'
-      );
-      return { success: true, offline: true };
-    }
-
-    // 1. Registered user scanning another attendee QR: auto-connect and reward them.
-    const attendeeProfile = getInviteFromCode(rawCode, user);
-    if (attendeeProfile) {
-      const attendeeName = attendeeProfile.name;
-      const attendeeRole = attendeeProfile.role;
-      const attendeeAvatar = attendeeProfile.avatarId || 'av-2';
-      const attendeeId = attendeeProfile.id;
-
-      if (attendeeId === user.id) {
-        playTone('error');
-        showToast('That Is Your QR', 'Scan another operator badge to connect.', 'warning');
-        return { success: false, reason: 'Cannot connect to yourself' };
-      }
-
-      if (connections.some(c => c.attendeeId === attendeeId)) {
-        playTone('error');
-        showToast('Already Connected', `You and ${attendeeName} have already plugged in!`, 'warning');
-        return { success: false, reason: 'Already connected' };
-      }
-
-      if (connections.length >= 10) {
-        showToast('Stage 2 Cap Reached', 'You have hit the 10-connection point cap, but network link added!', 'info');
-      }
-
-      const isDiff = attendeeRole !== user.role;
-      const pts = isDiff ? 15 : 10;
-
-      const newConn = {
-        id: `conn-${Date.now()}`,
-        attendeeId,
-        name: attendeeName,
-        role: attendeeRole,
-        avatarId: attendeeAvatar,
-        isDifferentRole: isDiff,
-        pointsAwarded: pts,
-        confirmedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-
-      setConnections(prev => [newConn, ...prev]);
-      addPoints(
-        `conn-${attendeeId}`,
-        `Two-Way Connect with ${attendeeName}`,
-        pts,
-        2,
-        isDiff ? `Connection (+10) & Role Bonus (+5 for ${attendeeRole} ↔ ${user.role})` : 'Connection (+10)'
-      );
-
-      return { success: true, type: 'attendee', name: attendeeName, points: pts };
-    }
-
-    // 2. Partner Booth: JTF26-[PARTNER]-B[NUM]
-    if (rawCode.includes('JTF26-') && (rawCode.includes('-B0') || rawCode.includes('-B1'))) {
-      const partner = PARTNERS.find(p => p.boothCode === rawCode || rawCode.includes(p.id.split('-')[1].toUpperCase()));
-      if (partner) {
-        const existing = partnerVisits[partner.id];
-        if (existing && existing.scanned) {
-          playTone('error');
-          showToast('Booth Already Scanned', `You already checked into ${partner.name}!`, 'warning');
-          return { success: false, reason: 'Already scanned booth' };
-        }
-
-        setPartnerVisits(prev => ({
-          ...prev,
-          [partner.id]: { ...(prev[partner.id] || {}), scanned: true, points: 10 }
-        }));
-
-        addPoints(`partner-booth-${partner.id}`, `Visited ${partner.name}`, 10, 4, `Booth check-in at ${partner.booth}`);
-
-        // Open partner mini task
-        setTimeout(() => {
-          setModalData(partner);
-          setActiveModal('partner_detail');
-        }, 500);
-
-        return { success: true, type: 'partner', partner };
-      }
-    }
-
-    // 3. Keynote Session: JTF26-HALL-[NAME]
-    if (rawCode.startsWith('JTF26-HALL-')) {
-      const session = SESSIONS.find(s => s.code === rawCode || rawCode.includes(s.id.toUpperCase()));
-      if (session) {
-        if (capturedSessions.includes(session.id)) {
-          playTone('error');
-          showToast('Session Already Captured', `You have already recorded attendance for: ${session.title}`, 'warning');
-          return { success: false, reason: 'Already captured' };
-        }
-
-        setCapturedSessions(prev => [...prev, session.id]);
-        addPoints(`session-${session.id}`, `Captured: ${session.title}`, 10, 2, `Session check-in at ${session.hall}`);
-        return { success: true, type: 'session', session };
-      }
-    }
-
-    // 4. Signal Drop: JTF26-SIGNAL-[NAME]
-    if (rawCode.startsWith('JTF26-SIGNAL-')) {
-      const drop = signalDrops.find(d => d.code === rawCode || rawCode.includes(d.id.toUpperCase()));
-      if (drop) {
-        if (claimedDrops.includes(drop.id)) {
-          playTone('error');
-          showToast('Signal Already Claimed', `You have already claimed this drop!`, 'warning');
-          return { success: false, reason: 'Already claimed drop' };
-        }
-
-        setClaimedDrops(prev => [...prev, drop.id]);
-        addPoints(`drop-${drop.id}`, `Signal Drop: ${drop.title}`, drop.points, 2, 'Surprise signal quest claimed!');
-        confetti({ particleCount: 80, spread: 65, origin: { y: 0.6 } });
-        return { success: true, type: 'drop', drop };
-      }
-    }
-
-    // Unknown code fallback
-    playTone('error');
-    showToast('Invalid QR Code', 'That QR is not recognized or has expired. Find a fresh one and try again.', 'error');
-    return { success: false, reason: 'Unrecognized code' };
-  };
-
-  const startSignup = () => {
-    setSignupInvite(null);
-    setSignupMode(false);
-    setActiveModal('signup');
-  };
-
-  const cancelSignup = () => {
-    setSignupMode(false);
-    setSignupInvite(null);
-    setActiveModal(null);
-  };
-
-  const completeSignup = ({ name, email, role }) => {
-    const normalizedName = String(name || '').trim();
-    const normalizedEmail = String(email || '').trim().toLowerCase();
-
-    if (!normalizedName) {
-      showToast('Name required', 'Please enter your full name before continuing.', 'warning');
-      return;
-    }
-
-    if (!normalizedEmail || !/^[^\s@]+@gmail\.com$/i.test(normalizedEmail)) {
-      showToast('Use a valid Gmail address', 'Only Gmail email addresses can be used for this signup flow.', 'warning');
-      return;
-    }
-
-    const newId = `op-${Date.now()}`;
-    const slug = normalizedName.replace(/[^A-Z0-9]+/gi, '-').replace(/^-|-$/g, '').toUpperCase() || 'OPERATOR';
-    const newUser = {
-      id: newId,
-      name: normalizedName,
-      email: normalizedEmail,
-      role: role || 'builder',
-      avatarId: 'av-1',
-      ticketType: 'free',
-      ticketId: `JTF26-REG-${normalizedEmail.split('@')[0].slice(0, 8).toUpperCase()}`,
-      hubId: 'hub-jos-innovators',
-      city: 'Jos',
-      bio: '',
-      qrToken: `JTF26-ATT-${slug}-${Date.now().toString().slice(-6)}`,
-      isCheckedIn: false,
-      isOnboarded: true,
-      hideFromPublicBoard: false
-    };
-
-    const nextPoints = 5;
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    setUser(newUser);
-    setPoints(nextPoints);
-    setLedger([
-      {
-        id: `led-profile-${Date.now()}`,
-        questId: 'q-profile',
-        title: 'Complete Operator Profile',
-        points: 5,
-        stage: 1,
-        timestamp: now,
-        reason: 'Profile setup on onboarding',
-        isReversed: false
-      }
-    ]);
-    setStage1Quests(INITIAL_STAGE1_QUESTS);
-    setPendingHandshakes([]);
-    setBlitzState({
-      completed: false,
-      score: 0,
-      correctCount: 0,
-      totalAnswered: 0,
-      speedBonusTotal: 0,
-      completedAt: null
-    });
-    roundtableCheckedInRef.current = false;
-    setRoundtableCheckedIn(false);
-    writeStorage('techfest_roundtable_checkin', 'false');
-
-    if (signupInvite) {
-      const isDifferentRole = signupInvite.role !== newUser.role;
-      const connectionPoints = isDifferentRole ? 15 : 10;
-      const newConnection = {
-        id: `conn-${Date.now()}`,
-        attendeeId: signupInvite.id,
-        name: signupInvite.name,
-        role: signupInvite.role,
-        avatarId: signupInvite.avatarId || 'av-2',
-        isDifferentRole,
-        pointsAwarded: connectionPoints,
-        confirmedAt: now
-      };
-
-      setConnections([newConnection]);
-      setPoints(connectionPoints + 5);
-      setLedger([
-        {
-          id: `led-profile-${Date.now()}`,
-          questId: 'q-profile',
-          title: 'Complete Operator Profile',
-          points: 5,
-          stage: 1,
-          timestamp: now,
-          reason: 'Profile setup on onboarding',
-          isReversed: false
-        },
-        {
-          id: `led-connect-${Date.now()}`,
-          questId: `conn-${signupInvite.id}`,
-          title: `Connected with ${signupInvite.name}`,
-          points: connectionPoints,
-          stage: 2,
-          timestamp: now,
-          reason: 'Joined through an operator invite QR',
-          isReversed: false
-        }
-      ]);
-      showToast('Demo account created', `You’re connected with ${signupInvite.name}. This profile is stored only in this browser.`, 'success');
-    } else {
-      setConnections([]);
-      setPartnerVisits({});
-      setCapturedSessions([]);
-      setClaimedDrops([]);
-      showToast('Demo account created', `The Gmail address format was accepted but not verified. Your profile is stored only in this browser.`, 'success');
-    }
-
-    setSignupMode(false);
-    setSignupInvite(null);
-    setCurrentTab('home');
-    setActiveModal(null);
-  };
-
-  // Replay & sync offline queue
-  const syncOfflineQueue = () => {
-    if (offlineQueue.length === 0) {
-      showToast('Offline Queue Clean', 'All scans are up to date. No pending records.', 'info');
-      return;
-    }
-
-    const queuedItems = [...offlineQueue];
-    const failedIds = [];
-
-    queuedItems.forEach(item => {
-      const result = handleQrScan(item.code, true);
-      if (!result || !result.success || result.offline) {
-        failedIds.push(item.id);
-      }
-    });
-
-    const syncedCount = queuedItems.length - failedIds.length;
-    setOfflineQueue(prev => prev.filter(item => failedIds.includes(item.id)));
-    if (failedIds.length > 0) {
-      showToast(
-        'Some Scans Need Attention',
-        `${syncedCount} scan(s) synced. ${failedIds.length} unrecognized scan(s) remain queued.`,
-        'warning'
-      );
-    } else {
-      showToast('Offline Scans Synced!', `Successfully synchronized ${syncedCount} offline scan(s).`, 'success');
-    }
-  };
-
-  // Toggle Network Online/Offline
-  const toggleNetwork = () => {
-    const nextState = !isOnline;
-    setIsOnline(nextState);
-    if (nextState) {
-      showToast('Network Restored', 'Back online at Sarau Center! Auto-syncing pending scans...', 'success');
-      setTimeout(() => {
-        syncOfflineQueue();
-      }, 400);
-    } else {
-      showToast('Offline Mode Activated', 'Simulating weak venue Wi-Fi. Scans will be queued locally.', 'warning');
-    }
-  };
-
-  const checkInRoundtable = () => {
-    if (roundtableCheckedInRef.current) {
-      showToast('Already Checked In', 'This browser has already recorded the roundtable check-in.', 'warning');
-      return;
-    }
-
-    roundtableCheckedInRef.current = true;
-    setRoundtableCheckedIn(true);
-    writeStorage('techfest_roundtable_checkin', 'true');
-    addPoints(
-      'day2-roundtable-1',
-      'Day 2 Founder Roundtable Check-In',
-      20,
-      2,
-      'Executive roundtable networking check-in'
-    );
-    showToast('Roundtable Check-In Recorded', '+20 demo points awarded.', 'success');
-  };
-
-  // Nigeria Data Protection Act (NDPA) Compliant one-tap deletion
-  const deleteMyData = () => {
-    try {
-      [
-        'techfest_user',
-        'techfest_points',
-        'techfest_ledger',
-        'techfest_stage1',
-        'techfest_connections',
-        'techfest_blitz',
-        'techfest_partners',
-        'techfest_sessions',
-        'techfest_drops',
-        'techfest_roundtable_checkin',
-        'techfest_offline_queue',
-        'techfest_visitor_name'
-      ].forEach(key => localStorage.removeItem(key));
-    } catch (error) {
-      showToast('Could Not Delete All Data', 'Browser storage restrictions prevented complete deletion.', 'error');
-      return;
-    }
-    setPoints(0);
-    setLedger([]);
-    setConnections([]);
-    setPendingHandshakes([]);
-    setBlitzState({ completed: false, score: 0, correctCount: 0, totalAnswered: 0, speedBonusTotal: 0, completedAt: null });
-    setPartnerVisits({});
-    setCapturedSessions([]);
-    setClaimedDrops([]);
-    setOfflineQueue([]);
-    roundtableCheckedInRef.current = false;
-    setRoundtableCheckedIn(false);
-    setUser({
-      id: `op-new-${Date.now()}`,
-      name: 'Guest Builder',
-      email: '',
-      role: 'builder',
-      avatarId: 'av-1',
-      ticketType: 'free',
-      ticketId: 'JTF26-GUEST',
-      hubId: 'hub-jos-innovators',
-      city: 'Jos',
-      bio: '',
-      qrToken: `JTF26-ATT-GUEST-${Date.now()}`,
-      isCheckedIn: false,
-      isOnboarded: false,
-      hideFromPublicBoard: false
-    });
-    showToast('Data Erased', 'All local records and personal information have been purged.', 'info');
-    setActiveModal(null);
-  };
-
-  // Current rank metadata
+  const getClearedStagesCount = () => [1, 2, 3, 4].filter(number => getStageProgress(number).isCleared).length;
   const currentRank = getTitleForPoints(points);
-  const avatarMeta = getAvatarMeta(user.avatarId);
-  const roleMeta = getRoleMeta(user.role);
+  const avatarMeta = getAvatarMeta(user?.avatarId || 'av-1');
+  const roleMeta = getRoleMeta(user?.role || 'builder');
 
-  return (
-    <AppContext.Provider
-      value={{
-        user,
-        setUser,
-        points,
-        addPoints,
-        ledger,
-        currentRank,
-        avatarMeta,
-        roleMeta,
-        stage1Quests,
-        completeStage1Quest,
-        connections,
-        pendingHandshakes,
-        confirmHandshake,
-        blitzState,
-        setBlitzState,
-        partnerVisits,
-        setPartnerVisits,
-        capturedSessions,
-        claimedDrops,
-        signalDrops,
-        handleQrScan,
-        isOnline,
-        toggleNetwork,
-        offlineQueue,
-        syncOfflineQueue,
-        roundtableCheckedIn,
-        checkInRoundtable,
-        toastMessage,
-        showToast,
-        currentTab,
-        setCurrentTab,
-        activeModal,
-        setActiveModal,
-        signupMode,
-        signupInvite,
-        startSignup,
-        cancelSignup,
-        completeSignup,
-        modalData,
-        setModalData,
-        getStageProgress,
-        getClearedStagesCount,
-        deleteMyData,
-        playTone
-      }}
-    >
-      {children}
-    </AppContext.Provider>
-  );
+  const value = {
+    user,
+    setUser: updateProfile,
+    updateProfile,
+    points,
+    ledger,
+    adminLedger,
+    currentRank,
+    avatarMeta,
+    roleMeta,
+    stage1Quests,
+    completeStage1Quest,
+    connections,
+    pendingHandshakes,
+    outgoingRequestIds,
+    confirmHandshake,
+    connectToAttendee,
+    blitzState,
+    submitPromptBlitz,
+    partnerVisits,
+    completePartnerTask,
+    capturedSessions,
+    claimedDrops,
+    attendees,
+    leaderboard,
+    signalDrops,
+    staffEventCodes,
+    isAdmin,
+    handleQrScan,
+    isOnline,
+    offlineQueue,
+    syncOfflineQueue,
+    toastMessage,
+    showToast,
+    currentTab,
+    setCurrentTab,
+    activeModal,
+    setActiveModal,
+    signupMode,
+    setSignupMode,
+    signupInvite,
+    startSignup: () => { setSignupInvite(null); setActiveModal('signup'); },
+    cancelSignup: () => setActiveModal(null),
+    sendLoginCode,
+    verifyLoginCode,
+    signOut,
+    modalData,
+    setModalData,
+    getStageProgress,
+    getClearedStagesCount,
+    deleteMyData,
+    triggerNewSignalDrop,
+    createEventCode,
+    reverseLedgerEntry,
+    playTone,
+    authLoading,
+    dataLoading,
+    backendError,
+    isSupabaseConfigured,
+    refreshData,
+    refreshLeaderboard
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
 export const useApp = () => useContext(AppContext);

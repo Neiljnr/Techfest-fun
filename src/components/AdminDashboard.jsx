@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { MOCK_ATTENDEES } from '../data/mockAttendees';
+import { PARTNERS } from '../data/partners';
+import { SESSIONS } from '../data/sessions';
+import QRCode from 'qrcode';
 import { 
   Shield, 
   Flame, 
@@ -18,34 +20,48 @@ import {
 
 export const AdminDashboard = () => {
   const { 
-    ledger, 
+    adminLedger,
     reverseLedgerEntry, 
-    signalDrops, 
-    triggerNewSignalDrop, 
+    staffEventCodes,
+    createEventCode,
+    leaderboard,
     setCurrentTab,
-    showToast 
+    showToast
   } = useApp();
 
   const [activeAdminTab, setActiveAdminTab] = useState('overview'); // 'overview', 'drops', 'ledger', 'finale'
   const [dropTitle, setDropTitle] = useState('');
   const [dropPoints, setDropPoints] = useState(20);
   const [dropHint, setDropHint] = useState('');
+  const [eventKind, setEventKind] = useState('signal');
+  const [eventId, setEventId] = useState('');
+  const [eventStage, setEventStage] = useState(2);
+  const [claimLimit, setClaimLimit] = useState(50);
+  const [expirationMinutes, setExpirationMinutes] = useState(10);
+  const [createdCode, setCreatedCode] = useState(null);
   const [reversalReason, setReversalReason] = useState('');
   const [reversingEntryId, setReversingEntryId] = useState(null);
 
-  const handleCreateDrop = (e) => {
+  const handleCreateDrop = async (e) => {
     e.preventDefault();
     if (!dropTitle.trim()) return;
 
-    triggerNewSignalDrop({
+    const result = await createEventCode({
+      kind: eventKind,
+      eventId: eventId.trim() || `${eventKind}-${crypto.randomUUID()}`,
       title: dropTitle.trim(),
       points: parseInt(dropPoints, 10) || 20,
-      hint: dropHint.trim() || 'Sarau Event Center Arena'
+      stage: Number(eventStage),
+      description: dropHint.trim(),
+      hint: dropHint.trim(),
+      claimLimit: claimLimit ? Number(claimLimit) : null,
+      expirationMinutes: Number(expirationMinutes)
     });
-
+    if (!result) return;
+    setCreatedCode(result);
     setDropTitle('');
     setDropHint('');
-    setActiveAdminTab('overview');
+    setEventId('');
   };
 
   const handleConfirmReversal = (id) => {
@@ -57,6 +73,11 @@ export const AdminDashboard = () => {
     setReversingEntryId(null);
     setReversalReason('');
   };
+
+  const publicPoints = leaderboard.reduce((sum, attendee) => sum + attendee.points, 0);
+  const activeCodeCount = staffEventCodes.filter(code => (
+    code.active && new Date(code.expires_at).getTime() > Date.now()
+  )).length;
 
   return (
     <div className="main-content">
@@ -140,42 +161,42 @@ export const AdminDashboard = () => {
           }}>
             <div className="quest-card" style={{ padding: '14px' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Sarau Check-Ins
+                Public leaderboard accounts
               </span>
               <div style={{ fontSize: '24px', fontWeight: '800', color: '#00E676', fontFamily: 'var(--font-heading)' }}>
-                812 / 1,000
+                {leaderboard.length}
               </div>
-              <span style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>81.2% Check-In Rate</span>
+              <span style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>Live Supabase directory</span>
             </div>
 
             <div className="quest-card" style={{ padding: '14px' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Active Scan Velocity
+                Active event QR codes
               </span>
               <div style={{ fontSize: '24px', fontWeight: '800', color: '#00B0FF', fontFamily: 'var(--font-heading)' }}>
-                48 scans/min
+                {activeCodeCount}
               </div>
-              <span style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>Across 10 partner booths</span>
+              <span style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>Organizer-issued and expiring</span>
             </div>
 
             <div className="quest-card" style={{ padding: '14px' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Total Points Minted
+                Public leaderboard points
               </span>
               <div style={{ fontSize: '24px', fontWeight: '800', color: '#FFD700', fontFamily: 'var(--font-heading)' }}>
-                248,650
+                {publicPoints.toLocaleString()}
               </div>
-              <span style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>Stored on immutable ledger</span>
+              <span style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>Computed from server ledger</span>
             </div>
 
             <div className="quest-card" style={{ padding: '14px' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Disputes Flagged
+                Ledger rows available
               </span>
               <div style={{ fontSize: '24px', fontWeight: '800', color: '#FFF', fontFamily: 'var(--font-heading)' }}>
-                0 Critical
+                {adminLedger.length}
               </div>
-              <span style={{ fontSize: '10.5px', color: 'var(--green-primary)' }}>Clean Audit Trace</span>
+              <span style={{ fontSize: '10.5px', color: 'var(--green-primary)' }}>Latest 200 entries</span>
             </div>
           </div>
 
@@ -214,93 +235,114 @@ export const AdminDashboard = () => {
             style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}
           >
             <h4 style={{ fontSize: '14px', fontWeight: '800', color: '#FFD700' }}>
-              Trigger New Live Signal Drop
+              Create an event QR
             </h4>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Broadcast surprise quests announced on the main Sarau stage.
+              Issue a random, server-generated QR for a partner, session, or limited-use event. Codes expire automatically.
             </p>
+
+            <label style={fieldLabelStyle}>
+              Event type
+              <select value={eventKind} onChange={(e) => {
+                const kind = e.target.value;
+                setEventKind(kind);
+                setEventStage(kind === 'partner' ? 4 : kind === 'session' ? 2 : 2);
+              }} style={fieldStyle}>
+                <option value="signal">Signal drop</option>
+                <option value="partner">Partner booth</option>
+                <option value="session">Session</option>
+                <option value="roundtable">Roundtable check-in</option>
+              </select>
+            </label>
+
+            {eventKind === 'partner' && (
+              <select value={eventId} onChange={e => setEventId(e.target.value)} style={fieldStyle} required>
+                <option value="">Select a partner</option>
+                {PARTNERS.map(partner => <option key={partner.id} value={partner.id}>{partner.name}</option>)}
+              </select>
+            )}
+            {eventKind === 'session' && (
+              <select value={eventId} onChange={e => setEventId(e.target.value)} style={fieldStyle}>
+                <option value="">Select a session</option>
+                {SESSIONS.map(session => <option key={session.id} value={session.id}>{session.title}</option>)}
+              </select>
+            )}
+            {(eventKind === 'signal' || eventKind === 'roundtable') && (
+              <input
+                type="text"
+                placeholder="Event ID (leave blank to generate one)"
+                value={eventId}
+                onChange={(e) => setEventId(e.target.value)}
+                style={fieldStyle}
+              />
+            )}
 
             <input
               type="text"
-              placeholder="Drop Title (e.g. Flash IoT Booth Challenge)"
+              placeholder="Event title"
               value={dropTitle}
               onChange={(e) => setDropTitle(e.target.value)}
-              style={{
-                background: 'rgba(0, 0, 0, 0.4)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '8px',
-                padding: '10px',
-                color: '#FFF',
-                fontSize: '13px'
-              }}
+              required
+              maxLength={100}
+              style={fieldStyle}
             />
 
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="number"
-                placeholder="Points"
+                placeholder="Points (1-50)"
+                min="1"
+                max="50"
                 value={dropPoints}
                 onChange={(e) => setDropPoints(e.target.value)}
-                style={{
-                  width: '100px',
-                  background: 'rgba(0, 0, 0, 0.4)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '8px',
-                  padding: '10px',
-                  color: '#FFF',
-                  fontSize: '13px'
-                }}
+                required
+                style={{ ...fieldStyle, width: '120px' }}
               />
               <input
                 type="text"
-                placeholder="Location hint (e.g. Near Sarau Stage)"
+                placeholder="Description / location hint"
                 value={dropHint}
                 onChange={(e) => setDropHint(e.target.value)}
-                style={{
-                  flex: 1,
-                  background: 'rgba(0, 0, 0, 0.4)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '8px',
-                  padding: '10px',
-                  color: '#FFF',
-                  fontSize: '13px'
-                }}
+                maxLength={160}
+                style={{ ...fieldStyle, flex: 1 }}
               />
             </div>
 
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <label style={fieldLabelStyle}>
+                Stage
+                <input type="number" min="1" max="4" value={eventStage}
+                  onChange={e => setEventStage(e.target.value)} style={fieldStyle} />
+              </label>
+              <label style={fieldLabelStyle}>
+                Claim limit
+                <input type="number" min="1" placeholder="Unlimited" value={claimLimit}
+                  onChange={e => setClaimLimit(e.target.value)} style={fieldStyle} />
+              </label>
+              <label style={fieldLabelStyle}>
+                Expires (minutes)
+                <input type="number" min="1" max="1440" value={expirationMinutes}
+                  onChange={e => setExpirationMinutes(e.target.value)} style={fieldStyle} />
+              </label>
+            </div>
+
+            {eventKind === 'partner' && (
+              <p style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                Challenge answers are checked against the private server answer key.
+              </p>
+            )}
+
             <button type="submit" className="pill-btn-action pill-btn-primary">
               <Flame size={16} />
-              <span>Broadcast Live to Attendees</span>
+              <span>Generate event QR</span>
             </button>
           </form>
 
-          {/* List of active drops */}
+          {createdCode && <EventCodeCard code={createdCode} showToast={showToast} />}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <h4 style={{ fontSize: '13px', fontWeight: '700' }}>Active Signal Drops ({signalDrops.length})</h4>
-            {signalDrops.map(d => (
-              <div 
-                key={d.id} 
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid var(--border-subtle)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#FFF' }}>{d.title}</span>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    📍 {d.hint} · {d.code}
-                  </div>
-                </div>
-                <span style={{ fontSize: '12px', fontWeight: '800', color: '#FFD700' }}>
-                  +{d.points} PTS
-                </span>
-              </div>
-            ))}
+            <h4 style={{ fontSize: '13px', fontWeight: '700' }}>Issued event codes ({staffEventCodes.length})</h4>
+            {staffEventCodes.map(code => <EventCodeCard key={code.code} code={code} showToast={showToast} />)}
           </div>
         </div>
       )}
@@ -318,7 +360,7 @@ export const AdminDashboard = () => {
             Every point change is stored as an immutable ledger record. Reversals require an audit reason.
           </div>
 
-          {ledger.map(entry => (
+          {adminLedger.map(entry => (
             <div
               key={entry.id}
               style={{
@@ -333,7 +375,7 @@ export const AdminDashboard = () => {
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '13px', fontWeight: '700', color: entry.isReversed ? '#FF5252' : '#FFF', textDecoration: entry.isReversed ? 'line-through' : 'none' }}>
-                  {entry.title}
+                  {entry.attendeeName ? `${entry.attendeeName}: ` : ''}{entry.title}
                 </span>
                 <span style={{ fontSize: '13px', fontWeight: '800', color: entry.isReversed ? '#FF5252' : 'var(--green-primary)' }}>
                   {entry.isReversed ? `-${entry.points}` : `+${entry.points}`} PTS
@@ -347,7 +389,7 @@ export const AdminDashboard = () => {
 
               {entry.isReversed && (
                 <span style={{ fontSize: '11px', color: '#FF8A80', fontStyle: 'italic' }}>
-                  Audit note: {entry.reversalReason}
+                  Audit note: {entry.reversalReason || entry.reason}
                 </span>
               )}
 
@@ -424,15 +466,15 @@ export const AdminDashboard = () => {
               Stage Finale: The Top 10 Prompt Battle
             </h4>
             <p style={{ fontSize: '12px', color: 'var(--text-light)', lineHeight: 1.4 }}>
-              Cutoff time freezes the main board. Top 10 finalists face off live on stage at Sarau Event Center before judges.
+              Rankings below use server-recorded scores and exclude attendees who opted out of the public board.
             </p>
           </div>
 
           <h4 style={{ fontSize: '13px', fontWeight: '700' }}>
-            Verified Stage Finalists (Cutoff Queue)
+            Current public leaderboard top 10
           </h4>
 
-          {MOCK_ATTENDEES.slice(0, 10).map((fin, idx) => (
+          {leaderboard.slice(0, 10).map((fin, idx) => (
             <div
               key={fin.id}
               style={{
@@ -452,7 +494,7 @@ export const AdminDashboard = () => {
                 <div>
                   <span style={{ fontSize: '13px', fontWeight: '700' }}>{fin.name}</span>
                   <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-                    Ticket: {fin.ticketType.toUpperCase()} · ID Checked ✅
+                    {fin.role} · public leaderboard
                   </div>
                 </div>
               </div>
@@ -466,4 +508,77 @@ export const AdminDashboard = () => {
       )}
     </div>
   );
+};
+
+const EventCodeCard = ({ code, showToast }) => {
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [qrError, setQrError] = useState('');
+  const expired = !code.active || new Date(code.expires_at).getTime() <= Date.now();
+
+  useEffect(() => {
+    let active = true;
+    QRCode.toDataURL(code.code, { width: 180, margin: 1 })
+      .then(url => {
+        if (active) setQrDataUrl(url);
+      })
+      .catch(error => {
+        console.error('Could not render the event QR code.', error);
+        if (active) setQrError('QR image could not be generated. Copy the code below and render it with a trusted QR tool.');
+      });
+    return () => { active = false; };
+  }, [code.code]);
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(code.code);
+      showToast('Event code copied', 'The code is ready to share with authorized event staff.', 'success');
+    } catch (error) {
+      console.error('Could not copy the event code.', error);
+      showToast('Could not copy code', 'Clipboard access was denied by this browser.', 'warning');
+    }
+  };
+
+  return (
+    <div className="quest-card" style={{
+      padding: '12px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '14px',
+      opacity: expired ? 0.6 : 1
+    }}>
+      {!expired && qrDataUrl && (
+        <img src={qrDataUrl} alt={`QR code for ${code.title}`} style={{ width: 100, height: 100, background: '#FFF', padding: 5, borderRadius: 8 }} />
+      )}
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <strong>{code.title}</strong>
+        <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 4 }}>
+          {code.kind} · +{code.points} points · {code.claimed_count}/{code.claim_limit ?? '∞'} claims
+        </div>
+        <code style={{ display: 'block', overflowWrap: 'anywhere', marginTop: 6 }}>{code.code}</code>
+        <div style={{ color: expired ? '#FF8A80' : 'var(--green-primary)', fontSize: 11, marginTop: 4 }}>
+          {expired ? 'Expired or disabled' : `Expires ${new Date(code.expires_at).toLocaleString()}`}
+        </div>
+        {qrError && <p style={{ color: '#FF8A80', fontSize: 11 }}>{qrError}</p>}
+        {!expired && <button type="button" className="pill-btn-action pill-btn-secondary" onClick={copyCode}>Copy code</button>}
+      </div>
+    </div>
+  );
+};
+
+const fieldStyle = {
+  background: 'rgba(0, 0, 0, 0.4)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: '8px',
+  padding: '10px',
+  color: '#FFF',
+  fontSize: '13px'
+};
+
+const fieldLabelStyle = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px',
+  fontSize: '11px',
+  color: 'var(--text-muted)'
 };

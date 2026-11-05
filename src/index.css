@@ -426,15 +426,6 @@ h1, h2, h3, h4, h5 {
   padding: 0 8px;
 }
 
-.demo-notice {
-  padding: 9px 12px;
-  border: 1px solid rgba(255, 215, 0, 0.25);
-  border-radius: 10px;
-  background: rgba(255, 215, 0, 0.06);
-  color: #E8DDAA;
-  font-size: 11px;
-}
-
 /* Connecting line behind stages */
 .stages-nodes-row::before {
   content: '';

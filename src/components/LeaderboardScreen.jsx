@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { MOCK_ATTENDEES, FOUNDER_TRACK_ATTENDEES } from '../data/mockAttendees';
-import { COMMUNITY_HUBS, getNormalizedHubScore } from '../data/hubs';
+import { COMMUNITY_HUBS } from '../data/hubs';
 import { getAvatarMeta } from '../data/avatars';
+import { getTitleForPoints } from '../data/ranks';
 import { 
   Trophy, 
   Crown, 
@@ -16,42 +16,42 @@ import {
 } from 'lucide-react';
 
 export const LeaderboardScreen = () => {
-  const { user, points, currentRank, setCurrentTab } = useApp();
+  const { user, points, setCurrentTab, leaderboard } = useApp();
   const [activeBoardTab, setActiveBoardTab] = useState('main'); // 'main', 'founder', 'hubs'
   const [searchFilter, setSearchFilter] = useState('');
 
-  // Assemble Main Board list with current live user inserted
-  const mainBoardList = [...MOCK_ATTENDEES, {
+  const ownBoardEntry = {
     id: user.id,
     name: user.name,
     role: user.role,
-    title: currentRank.title,
+    title: getTitleForPoints(points).title,
     points: points,
     avatarId: user.avatarId,
-    ticketType: user.ticketType,
     hubId: user.hubId
-  }]
+  };
+  const boardWithCurrentUser = leaderboard.some(player => player.id === user.id)
+    ? leaderboard
+    : [...leaderboard, ownBoardEntry];
+  const mainBoardList = [...boardWithCurrentUser]
     .sort((a, b) => b.points - a.points)
     .filter(p => p.name.toLowerCase().includes(searchFilter.toLowerCase()));
 
-  // Founder track list
-  const founderBoardList = [...FOUNDER_TRACK_ATTENDEES]
+  const founderBoardList = boardWithCurrentUser.filter(attendee => attendee.role === 'founder')
     .sort((a, b) => b.points - a.points);
 
-  // Hub Wars list (sorted by normalized score)
-  const hubsList = [...COMMUNITY_HUBS]
+  const hubsList = COMMUNITY_HUBS
     .map(hub => {
-      // Add current user points if member of this hub
-      const extraPts = user.hubId === hub.id ? points : 0;
-      const total = hub.totalPoints + extraPts;
-      const members = hub.members + (user.hubId === hub.id ? 1 : 0);
+      const membersInHub = boardWithCurrentUser.filter(attendee => attendee.hubId === hub.id);
+      const total = membersInHub.reduce((sum, attendee) => sum + attendee.points, 0);
+      const members = membersInHub.length;
       return {
         ...hub,
-        calculatedScore: Math.round(total / members),
+        calculatedScore: members ? Math.round(total / members) : 0,
         totalPoints: total,
         members
       };
     })
+    .filter(hub => hub.members > 0)
     .sort((a, b) => b.calculatedScore - a.calculatedScore);
 
   const top3 = mainBoardList.slice(0, 3);
@@ -283,7 +283,7 @@ export const LeaderboardScreen = () => {
                         {player.name} {isMe && '(You)'}
                       </span>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        {player.title} · {player.role.toUpperCase()}
+                        {getTitleForPoints(player.points).title} · {player.role.toUpperCase()}
                       </div>
                     </div>
                   </div>
@@ -339,7 +339,7 @@ export const LeaderboardScreen = () => {
                     {f.name}
                   </span>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    {f.company} · {f.roundtables} Roundtables · {f.warmIntros} Warm Intros
+                    {f.role} · {f.points} verified event points
                   </div>
                 </div>
               </div>

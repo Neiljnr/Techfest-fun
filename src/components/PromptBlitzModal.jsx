@@ -1,24 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { QUIZ_QUESTIONS, calculateBlitzScore } from '../data/quizQuestions';
+import { QUIZ_QUESTIONS } from '../data/quizQuestions';
 import confetti from 'canvas-confetti';
 import { 
   X, 
   Zap, 
   Clock, 
-  CheckCircle, 
-  XCircle, 
   Award, 
-  RotateCcw,
-  Sparkles,
   ArrowRight
 } from 'lucide-react';
 
 export const PromptBlitzModal = () => {
   const { 
     blitzState, 
-    setBlitzState, 
-    addPoints, 
+    submitPromptBlitz,
     setActiveModal, 
     playTone,
     showToast 
@@ -28,9 +23,9 @@ export const PromptBlitzModal = () => {
   const [secondsLeft, setSecondsLeft] = useState(20);
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
-  const [sessionScore, setSessionScore] = useState(0);
-  const [sessionCorrect, setSessionCorrect] = useState(0);
+  const [answers, setAnswers] = useState(() => Array(QUIZ_QUESTIONS.length).fill(-1));
   const [quizFinished, setQuizFinished] = useState(blitzState.completed);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const timerRef = useRef(null);
 
   const currentQ = QUIZ_QUESTIONS[currentIndex];
@@ -56,25 +51,16 @@ export const PromptBlitzModal = () => {
   const handleTimeOut = () => {
     setIsAnswered(true);
     setSelectedOption(-1); // Timed out
+    setAnswers(previous => previous.map((answer, index) => index === currentIndex ? -1 : answer));
     playTone('error');
   };
 
   const handleSelectOption = (idx) => {
     if (isAnswered) return;
     clearInterval(timerRef.current);
-
     setSelectedOption(idx);
     setIsAnswered(true);
-
-    const isCorrect = idx === currentQ.correctIndex;
-    if (isCorrect) {
-      const qScore = calculateBlitzScore(secondsLeft);
-      setSessionScore(prev => prev + qScore);
-      setSessionCorrect(prev => prev + 1);
-      playTone('points');
-    } else {
-      playTone('error');
-    }
+    setAnswers(previous => previous.map((answer, index) => index === currentIndex ? idx : answer));
   };
 
   const nextQuestion = () => {
@@ -89,33 +75,17 @@ export const PromptBlitzModal = () => {
     }
   };
 
-  const completeQuiz = () => {
+  const completeQuiz = async () => {
+    setIsSubmitting(true);
+    const result = await submitPromptBlitz(answers);
+    setIsSubmitting(false);
+    if (!result) return;
     setQuizFinished(true);
-    const finalScore = sessionScore;
-    const finalCorrect = sessionCorrect;
-
-    setBlitzState({
-      completed: true,
-      score: finalScore,
-      correctCount: finalCorrect,
-      totalAnswered: 10,
-      completedAt: new Date().toLocaleTimeString()
-    });
-
-    // Add points to ledger
-    addPoints(
-      'prompt-blitz-final',
-      'Prompt Blitz AI Quiz',
-      finalScore,
-      3,
-      `Prompt Blitz Completed: ${finalCorrect}/10 correct with speed bonuses`
-    );
-
-    if (finalCorrect >= 5) {
-      playTone('stage_clear');
+    if (result.correct_count >= 5) {
+      playTone('points');
       confetti({ particleCount: 100, spread: 75, origin: { y: 0.6 } });
-      showToast('Stage 3 Cleared!', `Prompt Blitz passed with ${finalCorrect}/10 correct. You dey move!`, 'success');
     }
+    showToast('Quiz scored', `${result.correct_count}/10 correct. ${result.score} points recorded on the server.`, 'success');
   };
 
   return (
@@ -136,7 +106,7 @@ export const PromptBlitzModal = () => {
             <div>
               <h3 className="modal-title">Stage 3: Prompt Blitz</h3>
               <p style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                10 Questions · 20s Per Question · Speed-Weighted Points
+                10 Questions · 20s Per Question · 10 points per correct answer
               </p>
             </div>
           </div>
@@ -165,7 +135,7 @@ export const PromptBlitzModal = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Award size={16} color="#FFD700" />
                   <span style={{ fontWeight: '800', color: '#FFD700' }}>
-                    {sessionScore} PTS
+                    {answers.filter(answer => answer >= 0).length}/10 answered
                   </span>
                 </div>
               </div>
@@ -178,7 +148,7 @@ export const PromptBlitzModal = () => {
                     {secondsLeft}s remaining
                   </span>
                   <span style={{ color: 'var(--green-primary)', fontWeight: '700' }}>
-                    Potential: +{calculateBlitzScore(secondsLeft)} pts
+                    Scored by the event server
                   </span>
                 </div>
 
@@ -232,27 +202,11 @@ export const PromptBlitzModal = () => {
               {/* Options */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {currentQ.options.map((opt, idx) => {
-                  let optStyle = {
+                  const optStyle = {
                     background: 'rgba(255, 255, 255, 0.03)',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
                     color: 'var(--text-white)'
                   };
-
-                  if (isAnswered) {
-                    if (idx === currentQ.correctIndex) {
-                      optStyle = {
-                        background: 'rgba(0, 230, 118, 0.15)',
-                        border: '1.5px solid #00E676',
-                        color: '#FFF'
-                      };
-                    } else if (idx === selectedOption) {
-                      optStyle = {
-                        background: 'rgba(255, 82, 82, 0.15)',
-                        border: '1.5px solid #FF5252',
-                        color: '#FFF'
-                      };
-                    }
-                  }
 
                   return (
                     <button
@@ -270,16 +224,15 @@ export const PromptBlitzModal = () => {
                         justifyContent: 'space-between',
                         gap: '10px',
                         transition: 'all 0.15s ease',
-                        ...optStyle
+                        ...optStyle,
+                        ...(idx === selectedOption ? {
+                          background: 'rgba(0, 176, 255, 0.15)',
+                          border: '1.5px solid #00B0FF',
+                          color: '#FFF'
+                        } : {})
                       }}
                     >
                       <span>{opt}</span>
-                      {isAnswered && idx === currentQ.correctIndex && (
-                        <CheckCircle size={18} color="#00E676" />
-                      )}
-                      {isAnswered && idx === selectedOption && idx !== currentQ.correctIndex && (
-                        <XCircle size={18} color="#FF5252" />
-                      )}
                     </button>
                   );
                 })}
@@ -296,14 +249,12 @@ export const PromptBlitzModal = () => {
                   flexDirection: 'column',
                   gap: '10px'
                 }}>
-                  <p style={{ fontSize: '12.5px', color: 'var(--text-light)', lineHeight: 1.4 }}>
-                    <strong>Insight:</strong> {currentQ.explanation}
-                  </p>
                   <button
                     className="pill-btn-action pill-btn-primary"
                     onClick={nextQuestion}
+                    disabled={isSubmitting}
                   >
-                    <span>{currentIndex + 1 === 10 ? 'Finish Blitz & View Results' : 'Next Question'}</span>
+                    <span>{isSubmitting ? 'Submitting…' : currentIndex + 1 === 10 ? 'Submit for Scoring' : 'Next Question'}</span>
                     <ArrowRight size={16} />
                   </button>
                 </div>

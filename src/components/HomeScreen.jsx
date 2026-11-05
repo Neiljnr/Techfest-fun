@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { STAGES } from '../data/quests';
-import { MOCK_ATTENDEES } from '../data/mockAttendees';
+import { getTitleForPoints } from '../data/ranks';
 import { 
   Zap, 
   Users, 
@@ -10,14 +9,10 @@ import {
   Check, 
   Lock, 
   ArrowRight, 
-  Copy, 
-  Share2, 
-  MessageCircle, 
   QrCode, 
   Sparkles,
   Flame,
   Award,
-  ExternalLink,
   ChevronRight
 } from 'lucide-react';
 
@@ -32,32 +27,10 @@ export const HomeScreen = () => {
     setModalData,
     setCurrentTab,
     signalDrops,
-    showToast
+    leaderboard
   } = useApp();
 
-  const [copiedRef, setCopiedRef] = useState(false);
-
   const clearedCount = getClearedStagesCount();
-  const referralLink = 'https://techfestjos.org/quest';
-
-  const copyShareLink = async () => {
-    try {
-      if (!navigator.clipboard?.writeText) {
-        throw new Error('Clipboard access is unavailable in this browser.');
-      }
-      await navigator.clipboard.writeText(referralLink);
-      setCopiedRef(true);
-      showToast('Link Copied!', 'Share the TechFest Quest demo with fellow builders.', 'success');
-      setTimeout(() => setCopiedRef(false), 2500);
-    } catch (error) {
-      showToast('Could Not Copy Link', 'Copy the event link from the field manually.', 'error');
-    }
-  };
-
-  const shareWhatsApp = () => {
-    const text = encodeURIComponent(`Automate the Day at Jos TechFest 2026! Join me on TechFest Quest, complete challenges and climb the leaderboard at Sarau Event Center: ${referralLink}`);
-    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
-  };
 
   // Determine active stage for Next Up
   const stage1Prog = getStageProgress(1);
@@ -83,15 +56,18 @@ export const HomeScreen = () => {
 
   // Top 5 preview
   // Insert current user into leaderboard copy to compute exact live rank
-  const allBoard = [...MOCK_ATTENDEES, {
+  const allBoard = leaderboard.some(player => player.id === user.id)
+    ? [...leaderboard]
+    : [...leaderboard, {
     id: user.id,
     name: user.name,
     role: user.role,
     title: currentRank.title,
     points: points,
     avatarId: user.avatarId,
-    ticketType: user.ticketType
-  }].sort((a, b) => b.points - a.points);
+    hubId: user.hubId
+  }];
+  allBoard.sort((a, b) => b.points - a.points);
 
   const userRankIndex = allBoard.findIndex(p => p.id === user.id) + 1;
   const top5 = allBoard.slice(0, 5);
@@ -124,36 +100,7 @@ export const HomeScreen = () => {
           </p>
         </div>
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: 'rgba(0, 0, 0, 0.35)',
-          padding: '10px 14px',
-          borderRadius: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.05)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: '#FFD700',
-              boxShadow: '0 0 8px #FFD700'
-            }} />
-            <span style={{ fontSize: '12.5px', color: '#E0E7E2' }}>
-              Demo profile · event check-in not verified
-            </span>
-          </div>
-          <span style={{ fontSize: '11px', color: 'var(--green-primary)', fontWeight: '700' }}>
-            DEMO
-          </span>
-        </div>
       </div>
-
-      <p className="demo-notice">
-        Prototype demo: profiles and scores are stored in this browser and are not verified for official event scoring.
-      </p>
 
       {/* 2. Quest Tracker Card (H3) */}
       <div className="quest-card stage-tracker-card">
@@ -365,51 +312,6 @@ export const HomeScreen = () => {
         </button>
       </div>
 
-      {/* 6. Referral Card (H5) */}
-      <div className="quest-card referral-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h4 style={{ fontSize: '15px', fontWeight: '700' }}>Share TechFest Quest</h4>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Invite friends to try the demo. Referral tracking and points are not enabled.
-            </p>
-          </div>
-          <span style={{
-            background: 'rgba(0, 230, 118, 0.15)',
-            color: 'var(--green-primary)',
-            fontSize: '11px',
-            fontWeight: '700',
-            padding: '4px 8px',
-            borderRadius: '8px'
-          }}>
-            DEMO LINK
-          </span>
-        </div>
-
-        <div className="referral-link-box">
-          <input 
-            type="text" 
-            readOnly 
-            value={referralLink} 
-            className="referral-input" 
-          />
-          <button className="btn-copy" onClick={copyShareLink}>
-            {copiedRef ? 'Copied!' : 'Copy'}
-          </button>
-        </div>
-
-        <div className="share-buttons-row">
-          <button className="share-btn whatsapp" onClick={shareWhatsApp}>
-            <MessageCircle size={15} />
-            <span>WhatsApp</span>
-          </button>
-          <button className="share-btn" onClick={copyShareLink}>
-            <Share2 size={15} />
-            <span>Share Link</span>
-          </button>
-        </div>
-      </div>
-
       {/* 7. Top 5 Players Preview (H9) */}
       <div className="quest-card leaderboard-preview-card">
         <div className="card-title-row">
@@ -445,7 +347,7 @@ export const HomeScreen = () => {
                       {player.name} {isMe && <span style={{ color: 'var(--green-primary)', fontSize: '11px' }}>(You)</span>}
                     </div>
                     <div className="preview-player-role">
-                      {player.title} · {player.role.toUpperCase()}
+                      {getTitleForPoints(player.points).title} · {player.role.toUpperCase()}
                     </div>
                   </div>
                 </div>
@@ -456,53 +358,6 @@ export const HomeScreen = () => {
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* 8. Community Links & Event Dispatch (H8) */}
-      <div className="quest-card" style={{ padding: '14px' }}>
-        <h4 style={{ fontSize: '13.5px', fontWeight: '700', marginBottom: '10px', color: 'var(--text-light)' }}>
-          Plateau Tech Community Hub
-        </h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <a 
-            href="https://whatsapp.com/channel/jos-techfest" 
-            target="_blank" 
-            rel="noreferrer"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '8px 12px',
-              borderRadius: '8px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              color: 'var(--text-white)',
-              textDecoration: 'none',
-              fontSize: '12.5px'
-            }}
-          >
-            <span>💬 Official WhatsApp Community Channel</span>
-            <ExternalLink size={14} color="var(--green-primary)" />
-          </a>
-          <a 
-            href="https://techfestjos.org" 
-            target="_blank" 
-            rel="noreferrer"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '8px 12px',
-              borderRadius: '8px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              color: 'var(--text-white)',
-              textDecoration: 'none',
-              fontSize: '12.5px'
-            }}
-          >
-            <span>🌐 TechFest 2026 Sarau Event Agenda & Speakers</span>
-            <ExternalLink size={14} color="var(--green-primary)" />
-          </a>
         </div>
       </div>
     </div>

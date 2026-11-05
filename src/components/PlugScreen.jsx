@@ -19,9 +19,7 @@ export const PlugScreen = () => {
     connections, 
     pendingHandshakes, 
     confirmHandshake, 
-    startSignup,
-    roundtableCheckedIn,
-    checkInRoundtable
+    setActiveModal
   } = useApp();
 
   const [qrUrl, setQrUrl] = useState('');
@@ -33,18 +31,7 @@ export const PlugScreen = () => {
     setQrUrl('');
     setQrError('');
 
-    const qrToken = user.qrToken || `JTF26-ATT-${user.id}`;
-    const inviteUrl = new URL(window.location.pathname, window.location.origin);
-    inviteUrl.searchParams.set('register', 'true');
-    inviteUrl.searchParams.set('join', JSON.stringify({
-      id: user.id,
-      name: user.name,
-      role: user.role,
-      avatarId: user.avatarId,
-      qrToken
-    }));
-
-    QRCode.toDataURL(inviteUrl.toString(), {
+    QRCode.toDataURL(`JTF26-ATT-${user.qrToken}`, {
         width: 320,
         margin: 4,
         errorCorrectionLevel: 'H',
@@ -105,9 +92,7 @@ export const PlugScreen = () => {
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: '800' }}>
-                    {hs.name} scanned your QR!
-                  </h4>
+                  <h4 style={{ fontSize: '15px', fontWeight: '800' }}>{hs.name} wants to connect</h4>
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                     Role: {hs.role.toUpperCase()} {hs.role !== user.role && '· 🌟 Cross-role bonus eligible!'}
                   </span>
@@ -120,7 +105,7 @@ export const PlugScreen = () => {
                   padding: '3px 8px',
                   borderRadius: '6px'
                 }}>
-                  +{hs.points} PTS
+                  Awaiting acceptance
                 </span>
               </div>
 
@@ -131,7 +116,7 @@ export const PlugScreen = () => {
                   onClick={() => confirmHandshake(hs.id)}
                 >
                   <Check size={16} strokeWidth={3} />
-                  <span>Confirm Connection (+{hs.points} pts)</span>
+                  <span>Confirm connection</span>
                 </button>
               </div>
             </div>
@@ -139,25 +124,7 @@ export const PlugScreen = () => {
         </div>
       )}
 
-      {/* 2. My QR Code Card (High Contrast) */}
-      <div className="quest-card" style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        textAlign: 'center',
-        gap: '10px',
-        borderColor: 'rgba(0, 230, 118, 0.3)'
-      }}>
-        <h3 style={{ fontSize: '15px', fontWeight: '800' }}>New to TechFest Quest?</h3>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-          Scan a signed-up operator’s badge to create your demo account and connect automatically.
-        </p>
-        <button className="pill-btn-action pill-btn-secondary" onClick={startSignup}>
-          <QrCode size={16} />
-          <span>Join with a QR invite</span>
-        </button>
-      </div>
-
+      {/* Attendee badge */}
       <div 
         className="quest-card" 
         style={{ 
@@ -216,7 +183,7 @@ export const PlugScreen = () => {
         </div>
       </div>
 
-      {/* 3. Day 2: Founder Track Roundtable Check-in (Section 6) */}
+      {/* Organizer-issued event attendance */}
       <div 
         className="quest-card"
         style={{
@@ -234,15 +201,8 @@ export const PlugScreen = () => {
               Day 2: Founder Roundtable
             </h4>
           </div>
-          <span style={{
-            fontSize: '11px',
-            fontWeight: '800',
-            color: '#00B0FF',
-            background: 'rgba(0, 176, 255, 0.15)',
-            padding: '2px 8px',
-            borderRadius: '6px'
-          }}>
-            +20 PTS
+          <span style={{ fontSize: '11px', fontWeight: '800', color: '#00B0FF' }}>
+            Verified check-in
           </span>
         </div>
 
@@ -250,30 +210,13 @@ export const PlugScreen = () => {
           Exclusive executive track for CEOs, CTOs and founders at Sarau VIP lounge.
         </p>
         <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          Demo only: this check-in is stored in this browser and does not verify event attendance.
+          Scan the active organizer-issued QR at the roundtable. Points are recorded once by the event server.
         </p>
 
-        {roundtableCheckedIn ? (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '12.5px',
-            color: '#00B0FF',
-            fontWeight: '700'
-          }}>
-            <Check size={16} strokeWidth={3} />
-            Demo check-in recorded
-          </div>
-        ) : (
-          <button
-            className="pill-btn-action pill-btn-primary"
-            style={{ fontSize: '13px' }}
-            onClick={checkInRoundtable}
-          >
-            Record Demo Check-In
-          </button>
-        )}
+        <button className="pill-btn-action pill-btn-primary" onClick={() => setActiveModal('scanner')}>
+          <QrCode size={16} />
+          <span>Scan event check-in QR</span>
+        </button>
       </div>
 
       {/* 4. Confirmed Connections List */}
@@ -313,7 +256,7 @@ export const PlugScreen = () => {
                 </span>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   {conn.role.toUpperCase()} · Confirmed at {conn.confirmedAt}
-                  {conn.isDifferentRole && ' · 🌟 Cross-role Bonus'}
+                  {conn.role !== user.role && ' · Cross-role'}
                 </div>
               </div>
 
@@ -322,7 +265,7 @@ export const PlugScreen = () => {
                 fontWeight: '800',
                 color: 'var(--green-primary)'
               }}>
-                +{conn.pointsAwarded} PTS
+                Connected
               </span>
             </div>
           ))

@@ -9,15 +9,11 @@ import {
   CheckCircle, 
   AlertCircle, 
   Upload,
-  Building2,
-  Users,
-  Radio,
-  Flame,
   Check
 } from 'lucide-react';
 
 export const ScannerModal = () => {
-  const { setActiveModal, handleQrScan, showToast, isOnline, signupMode } = useApp();
+  const { setActiveModal, handleQrScan, showToast } = useApp();
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -132,9 +128,9 @@ export const ScannerModal = () => {
       if (!isCancelled) {
         let msg = 'Camera permission denied or camera unavailable.';
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          msg = 'Camera permission was denied. Please allow camera permissions in your browser or use the test triggers below.';
+          msg = 'Camera permission was denied. Allow camera access in your browser or enter the event code manually.';
         } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-          msg = 'No camera found on this device. You can test via manual entry or test buttons below.';
+          msg = 'No camera was found. Enter the event code manually instead.';
         } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
           msg = 'Camera is in use by another app. Close background camera apps and try again.';
         }
@@ -167,7 +163,7 @@ export const ScannerModal = () => {
     }
   };
 
-  const processCode = useCallback((rawCode) => {
+  const processCode = useCallback(async (rawCode) => {
     if (!rawCode) return;
 
     // Clean and extract code (handle full URL encoding or trailing spaces)
@@ -184,10 +180,10 @@ export const ScannerModal = () => {
     }
 
     setCapturedTarget(cleanCode);
-    const res = handleQrScan(cleanCode);
+    const res = await handleQrScan(cleanCode);
     setScanResult(res);
 
-    if (res && res.success && res.type !== 'signup_invite' && res.type !== 'attendee_code') {
+    if (res && res.success && res.type !== 'partner') {
       setTimeout(() => {
         setActiveModal(null);
       }, 1500);
@@ -527,12 +523,10 @@ export const ScannerModal = () => {
           </div>
         </div>
 
-        {/* Body & Fast Test Simulator */}
+        {/* Scanner actions */}
         <div className="modal-body" style={{ paddingBottom: '30px' }}>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
-            {signupMode
-              ? 'Place the operator QR fully inside the green frame to join through their invite.'
-              : 'Center one QR code inside the green frame. Only the framed area is scanned.'}
+            Center an organizer-issued event QR or attendee QR inside the frame.
           </p>
 
           {/* Scan result status */}
@@ -566,95 +560,6 @@ export const ScannerModal = () => {
             </div>
           )}
 
-          {/* Instant Simulation Buttons (Essential for Desktop & Testing on any screen) */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--green-primary)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                ⚡ Test Code Simulator (All Targets)
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Tap to simulate real scan
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {/* 1. Attendee Scan */}
-              <button
-                className="share-btn"
-                onClick={() => processCode('JTF26-ATT-NANRET-4519')}
-                style={{ textAlign: 'left', padding: '10px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#00B0FF', fontWeight: '700', fontSize: '12px' }}>
-                  <Users size={14} />
-                  <span>Connect: Nanret P.</span>
-                </div>
-                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-                  Founder Role (+15 pts with Bonus)
-                </span>
-              </button>
-
-              {/* 2. Partner Booth PICTDA */}
-              <button
-                className="share-btn"
-                onClick={() => processCode('JTF26-PICTDA-B01')}
-                style={{ textAlign: 'left', padding: '10px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#00E676', fontWeight: '700', fontSize: '12px' }}>
-                  <Building2 size={14} />
-                  <span>Booth 01: PICTDA</span>
-                </div>
-                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-                  State AI Agency (+10 pts)
-                </span>
-              </button>
-
-              {/* 3. Partner Booth Sarau */}
-              <button
-                className="share-btn"
-                onClick={() => processCode('JTF26-SARAU-B02')}
-                style={{ textAlign: 'left', padding: '10px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#FFD700', fontWeight: '700', fontSize: '12px' }}>
-                  <Building2 size={14} />
-                  <span>Booth 02: Sarau Hub</span>
-                </div>
-                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-                  Venue Logistics (+10 pts)
-                </span>
-              </button>
-
-              {/* 4. Keynote Hall 1 */}
-              <button
-                className="share-btn"
-                onClick={() => processCode('JTF26-HALL-KEYNOTE1')}
-                style={{ textAlign: 'left', padding: '10px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#7C4DFF', fontWeight: '700', fontSize: '12px' }}>
-                  <Radio size={14} />
-                  <span>Opening Keynote</span>
-                </div>
-                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-                  Sarau Main Arena (+10 pts)
-                </span>
-              </button>
-
-              {/* 5. Golden Drop Coffee */}
-              <button
-                className="share-btn"
-                onClick={() => processCode('JTF26-SIGNAL-GOLDEN-COFFEE')}
-                style={{ gridColumn: 'span 2', textAlign: 'left', padding: '10px', background: 'rgba(255, 215, 0, 0.1)', borderColor: 'rgba(255, 215, 0, 0.3)' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#FFD700', fontWeight: '700', fontSize: '12px' }}>
-                  <Flame size={15} />
-                  <span>Golden QR at Coffee Station (Flash Drop)</span>
-                </div>
-                <span style={{ fontSize: '10.5px', color: 'var(--text-light)' }}>
-                  First 50 operators claim surprise +25 bonus points!
-                </span>
-              </button>
-            </div>
-          </div>
-
           {/* Fallback Manual Code Entry */}
           <form onSubmit={handleManualSubmit} style={{ marginTop: '8px' }}>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
@@ -663,7 +568,7 @@ export const ScannerModal = () => {
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="text"
-                placeholder="e.g. JTF26-ATT-NANRET-4519"
+                placeholder="Enter an organizer-issued code"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 style={{
