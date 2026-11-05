@@ -166,7 +166,7 @@ export const AdminDashboard = () => {
               <div style={{ fontSize: '24px', fontWeight: '800', color: '#00E676', fontFamily: 'var(--font-heading)' }}>
                 {leaderboard.length}
               </div>
-              <span style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>Live Supabase directory</span>
+              <span style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>Live organizer directory</span>
             </div>
 
             <div className="quest-card" style={{ padding: '14px' }}>

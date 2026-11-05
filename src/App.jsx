@@ -40,8 +40,8 @@ export const App = () => {
       <div className="app-container">
         <div className="app-wrapper" style={{ maxWidth: '480px' }}>
           <main className="main-content">
-            <h1>Supabase setup required</h1>
-            <p>Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to the local environment, run the database migration, then restart the app.</p>
+            <h1>Neon setup required</h1>
+            <p>Add <code>VITE_NEON_AUTH_URL</code> and <code>VITE_NEON_DATA_API_URL</code> to the environment, then restart the app.</p>
           </main>
         </div>
       </div>

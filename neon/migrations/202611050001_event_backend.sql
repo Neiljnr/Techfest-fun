@@ -1,4 +1,4 @@
-create extension if not exists pgcrypto with schema extensions;
+create extension if not exists pgcrypto with schema public;
 
 create table if not exists public.staff_allowlist (
   email text primary key check (email = lower(email)),
@@ -14,16 +14,17 @@ set search_path = ''
 as $$
   select exists (
     select 1
-    from public.staff_allowlist
-    where email = lower(coalesce(auth.jwt() ->> 'email', ''))
+    from public.staff_allowlist allowed
+    join neon_auth."user" account on lower(account.email) = allowed.email
+    where account.id = auth.uid() and account."emailVerified"
   );
 $$;
 
-revoke all on function public.is_event_staff() from public, anon;
+revoke all on function public.is_event_staff() from public;
 grant execute on function public.is_event_staff() to authenticated;
 
 create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
+  id uuid primary key references neon_auth."user"(id) on delete cascade,
   name text not null check (char_length(name) between 1 and 60),
   role text not null default 'builder'
     check (role in ('builder', 'founder', 'designer', 'operator', 'student')),
@@ -31,7 +32,7 @@ create table if not exists public.profiles (
   hub_id text not null default 'hub-jos-innovators',
   bio text not null default '' check (char_length(bio) <= 500),
   company text not null default '' check (char_length(company) <= 100),
-  qr_token uuid not null default extensions.gen_random_uuid() unique,
+  qr_token uuid not null default gen_random_uuid() unique,
   hide_from_public_board boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -49,7 +50,7 @@ create table if not exists public.participant_state (
 );
 
 create table if not exists public.point_ledger (
-  id uuid primary key default extensions.gen_random_uuid(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   event_key text not null,
   title text not null,
@@ -97,32 +98,8 @@ create table if not exists public.event_codes (
   check (expires_at > created_at)
 );
 
-insert into public.event_codes (code, kind, event_id, title, points, stage) values
-  ('JTF26-PICTDA-B01', 'partner', 'partner-pictda', 'Visited PICTDA', 10, 4),
-  ('JTF26-SARAU-B02', 'partner', 'partner-sarau', 'Visited Sarau', 10, 4),
-  ('JTF26-NHUB-B03', 'partner', 'partner-nhub', 'Visited nHub', 10, 4),
-  ('JTF26-ALTSCH-B04', 'partner', 'partner-altschool', 'Visited AltSchool Africa', 10, 4),
-  ('JTF26-PAYSTACK-B05', 'partner', 'partner-paystack', 'Visited Paystack', 10, 4),
-  ('JTF26-MTN5G-B06', 'partner', 'partner-mtn', 'Visited MTN 5G', 10, 4),
-  ('JTF26-GDGJOS-B07', 'partner', 'partner-gdgjos', 'Visited GDG Jos', 10, 4),
-  ('JTF26-NITDA-B08', 'partner', 'partner-nitda', 'Visited NITDA', 10, 4),
-  ('JTF26-BOIFUND-B09', 'partner', 'partner-boi', 'Visited Bank of Industry', 10, 4),
-  ('JTF26-JOSAIC-B10', 'partner', 'partner-josaicollective', 'Visited Jos AI Collective', 10, 4),
-  ('JTF26-HALL-KEYNOTE1', 'session', 'sess-1', 'Captured Opening Keynote', 10, 2),
-  ('JTF26-HALL-AGRITECH', 'session', 'sess-2', 'Captured Smart Agritech', 10, 2),
-  ('JTF26-HALL-FOUNDERS', 'session', 'sess-3', 'Captured Founders Panel', 10, 2),
-  ('JTF26-HALL-PAYMENTS', 'session', 'sess-4', 'Captured Automated Rails', 10, 2),
-  ('JTF26-HALL-EDGEAI', 'session', 'sess-5', 'Captured Industrial IoT', 10, 2),
-  ('JTF26-HALL-FINALE', 'session', 'sess-6', 'Captured Grand Finale', 10, 2),
-  ('JTF26-SIGNAL-GOLDEN-COFFEE', 'signal', 'drop-coffee-gold', 'Golden QR at the Coffee Station', 25, 2),
-  ('JTF26-SIGNAL-SPEAKER-TALK', 'signal', 'drop-speaker-selfie', 'Spot the Keynote Speaker', 20, 2),
-  ('JTF26-SIGNAL-AGRO-IOT', 'signal', 'drop-iot-demo', 'Inspect the Live IoT Agro-Sorter', 15, 2)
-on conflict (code) do nothing;
-
-delete from public.event_codes;
-
 create table if not exists public.connections (
-  id uuid primary key default extensions.gen_random_uuid(),
+  id uuid primary key default gen_random_uuid(),
   requester_id uuid not null references public.profiles(id) on delete cascade,
   recipient_id uuid not null references public.profiles(id) on delete cascade,
   status text not null default 'pending' check (status in ('pending', 'confirmed', 'declined')),
@@ -172,35 +149,46 @@ values
   ('partner-josaicollective', 3)
 on conflict (partner_id) do nothing;
 
-create or replace function public.handle_new_user()
-returns trigger
+create or replace function public.ensure_profile(p_name text default null, p_role text default null)
+returns public.profiles
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
+  account_email text;
+  account_verified boolean;
   profile_name text;
   profile_role text;
+  result public.profiles;
 begin
-  profile_name := left(trim(coalesce(new.raw_user_meta_data ->> 'name', split_part(new.email, '@', 1))), 60);
-  profile_role := coalesce(new.raw_user_meta_data ->> 'role', 'builder');
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  select * into result from public.profiles where id = auth.uid();
+  if found then return result; end if;
+
+  select email, "emailVerified" into account_email, account_verified
+  from neon_auth."user" where id = auth.uid();
+  if not found or not account_verified then raise exception 'A verified email is required'; end if;
+
+  profile_name := left(trim(coalesce(nullif(trim(p_name), ''), split_part(account_email, '@', 1))), 60);
+  if profile_name = '' then profile_name := 'Attendee'; end if;
+  profile_role := coalesce(p_role, 'builder');
   if profile_role not in ('builder', 'founder', 'designer', 'operator', 'student') then
     profile_role := 'builder';
   end if;
 
   insert into public.profiles (id, name, role)
-  values (new.id, profile_name, profile_role);
-  insert into public.participant_state (user_id) values (new.id);
+  values (auth.uid(), profile_name, profile_role)
+  on conflict (id) do nothing;
+  insert into public.participant_state (user_id) values (auth.uid()) on conflict (user_id) do nothing;
   insert into public.point_ledger (user_id, event_key, title, points, stage, reason)
-  values (new.id, 'profile-created', 'Create attendee profile', 5, 1, 'Verified email registration');
-  return new;
+  values (auth.uid(), 'profile-created', 'Create attendee profile', 5, 1, 'Verified email registration')
+  on conflict (user_id, event_key) do nothing;
+
+  select * into result from public.profiles where id = auth.uid();
+  return result;
 end;
 $$;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-after insert on auth.users
-for each row execute function public.handle_new_user();
 
 create or replace function public.award_points(
   p_user_id uuid,
@@ -226,7 +214,7 @@ begin
 end;
 $$;
 
-revoke all on function public.award_points(uuid, text, text, integer, smallint, text) from public, anon, authenticated;
+revoke all on function public.award_points(uuid, text, text, integer, smallint, text) from public, authenticated;
 
 create or replace function public.complete_stage_quest(p_quest_id text, p_input_url text default '')
 returns public.point_ledger
@@ -334,7 +322,7 @@ begin
   insert into public.event_codes
     (code, kind, event_id, title, points, stage, description, hint, badge, claim_limit, expires_at)
   values
-    ('JTF26-' || upper(p_kind) || '-' || upper(encode(extensions.gen_random_bytes(12), 'hex')),
+    ('JTF26-' || upper(p_kind) || '-' || upper(encode(public.gen_random_bytes(12), 'hex')),
      p_kind, p_event_id, trim(p_title), p_points, p_stage,
      left(trim(coalesce(p_description, '')), 500), left(trim(coalesce(p_hint, '')), 160),
      case p_kind when 'signal' then 'LIVE DROP' when 'partner' then 'PARTNER BOOTH'
@@ -551,7 +539,7 @@ set search_path = ''
 as $$
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
-  delete from auth.users where id = auth.uid();
+  delete from neon_auth."user" where id = auth.uid();
 end;
 $$;
 
@@ -663,27 +651,28 @@ create policy "Read own quiz attempt" on public.quiz_attempts
 for select to authenticated using (user_id = auth.uid());
 
 revoke all on public.staff_allowlist, public.quest_rules, public.event_codes, public.quiz_answer_key,
-  public.partner_task_answer_key from anon, authenticated;
-revoke all on public.profiles, public.participant_state, public.point_ledger, public.connections, public.quiz_attempts from anon, authenticated;
+  public.partner_task_answer_key from authenticated;
+revoke all on public.profiles, public.participant_state, public.point_ledger, public.connections, public.quiz_attempts from authenticated;
 grant select on public.profiles, public.participant_state, public.point_ledger, public.connections, public.quiz_attempts to authenticated;
 grant update (name, avatar_id, hub_id, bio, company, hide_from_public_board) on public.profiles to authenticated;
 grant select on public.attendee_directory, public.leaderboard to authenticated;
 grant select on public.active_event_catalog to authenticated;
 grant select on public.staff_ledger, public.staff_event_codes, public.my_connections to authenticated;
 
-revoke all on function public.complete_stage_quest(text, text) from public, anon;
-revoke all on function public.claim_event_code(text) from public, anon;
-revoke all on function public.staff_create_event_code(text, text, text, integer, smallint, text, text, integer, integer, integer) from public, anon;
-revoke all on function public.complete_partner_task(text, integer) from public, anon;
-revoke all on function public.request_connection(uuid) from public, anon;
-revoke all on function public.request_connection_by_id(uuid) from public, anon;
-revoke all on function public.confirm_connection(uuid) from public, anon;
-revoke all on function public.save_participant_state(jsonb) from public, anon;
-revoke all on function public.save_participant_state(jsonb) from authenticated;
-revoke all on function public.submit_prompt_blitz(integer[]) from public, anon;
-revoke all on function public.get_event_access() from public, anon;
-revoke all on function public.delete_my_account() from public, anon;
-revoke all on function public.staff_reverse_points(uuid, text) from public, anon;
+revoke all on function public.complete_stage_quest(text, text) from public;
+revoke all on function public.claim_event_code(text) from public;
+revoke all on function public.staff_create_event_code(text, text, text, integer, smallint, text, text, integer, integer, integer) from public;
+revoke all on function public.complete_partner_task(text, integer) from public;
+revoke all on function public.request_connection(uuid) from public;
+revoke all on function public.request_connection_by_id(uuid) from public;
+revoke all on function public.confirm_connection(uuid) from public;
+revoke all on function public.save_participant_state(jsonb) from public, authenticated;
+revoke all on function public.submit_prompt_blitz(integer[]) from public;
+revoke all on function public.get_event_access() from public;
+revoke all on function public.delete_my_account() from public;
+revoke all on function public.staff_reverse_points(uuid, text) from public;
+revoke all on function public.ensure_profile(text, text) from public;
+grant execute on function public.ensure_profile(text, text) to authenticated;
 grant execute on function public.complete_stage_quest(text, text) to authenticated;
 grant execute on function public.claim_event_code(text) to authenticated;
 grant execute on function public.staff_create_event_code(text, text, text, integer, smallint, text, text, integer, integer, integer) to authenticated;

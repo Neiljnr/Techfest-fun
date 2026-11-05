@@ -30,3 +30,5 @@ lerna-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+.vercel
+.env*

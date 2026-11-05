@@ -4,7 +4,17 @@ import { INITIAL_STAGE1_QUESTS } from '../data/quests';
 import { PARTNERS } from '../data/partners';
 import { getTitleForPoints } from '../data/ranks';
 import { getAvatarMeta, getRoleMeta } from '../data/avatars';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { isNeonConfigured as isSupabaseConfigured, neon as supabase } from '../lib/neon';
+
+const PENDING_SIGNUP_KEY = 'techfest-pending-signup';
+
+const readPendingSignup = () => {
+  try {
+    return JSON.parse(localStorage.getItem(PENDING_SIGNUP_KEY) || 'null');
+  } catch {
+    return null;
+  }
+};
 
 const AppContext = createContext(null);
 const EMPTY_BLITZ = {
@@ -166,6 +176,13 @@ export const AppProvider = ({ children }) => {
     setDataLoading(true);
     setBackendError('');
     try {
+      const pending = readPendingSignup();
+      const { error: profileError } = await supabase.rpc('ensure_profile', {
+        p_name: pending?.email === authUser.email?.toLowerCase() ? pending.name : null,
+        p_role: pending?.email === authUser.email?.toLowerCase() ? pending.role : null
+      });
+      if (profileError) throw profileError;
+      localStorage.removeItem(PENDING_SIGNUP_KEY);
       const [profileResult, stateResult, ledgerResult, connectionsResult,
         attendeesResult, boardResult, catalogResult, accessResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', authUser.id).single(),
@@ -343,13 +360,16 @@ export const AppProvider = ({ children }) => {
 
   const sendLoginCode = async ({ name, email, role, createAccount }) => {
     if (!isSupabaseConfigured) {
-      showToast('Backend setup required', 'Add the Supabase project URL and anon key to the environment before signing in.', 'error');
+      showToast('Backend setup required', 'Add the Neon Auth and Data API URLs to the environment before signing in.', 'error');
       return false;
     }
     const normalizedEmail = String(email || '').trim().toLowerCase();
-    const options = createAccount
-      ? { shouldCreateUser: true, data: { name: String(name || '').trim(), role } }
-      : { shouldCreateUser: false };
+    if (createAccount) {
+      localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
+        email: normalizedEmail, name: String(name || '').trim(), role
+      }));
+    }
+    const options = { shouldCreateUser: Boolean(createAccount) };
     const { error } = await supabase.auth.signInWithOtp({ email: normalizedEmail, options });
     if (error) {
       showError('Could not send verification code', error);
@@ -360,7 +380,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const verifyLoginCode = async (email, token) => {
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email: String(email || '').trim().toLowerCase(),
       token: String(token || '').trim(),
       type: 'email'
@@ -369,6 +389,8 @@ export const AppProvider = ({ children }) => {
       showError('Verification failed', error);
       return false;
     }
+    // The Neon adapter does not always emit SIGNED_IN after OTP verification.
+    if (data?.session) setSession(data.session);
     return true;
   };
 
@@ -378,6 +400,7 @@ export const AppProvider = ({ children }) => {
       showError('Could not sign out', error);
       return false;
     }
+    setSession(null);
     setCurrentTab('home');
     setActiveModal(null);
     return true;
