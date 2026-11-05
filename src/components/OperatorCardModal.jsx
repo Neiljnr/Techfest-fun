@@ -29,19 +29,26 @@ export const OperatorCardModal = () => {
   const clearedStages = getClearedStagesCount();
 
   useEffect(() => {
-    if (user.qrToken) {
-      QRCode.toDataURL(user.qrToken, {
-        width: 180,
-        margin: 1,
-        color: {
-          dark: '#00E676',
-          light: '#0A0E0C'
-        }
-      }).then(url => {
-        setQrDataUrl(url);
-      });
-    }
-  }, [user.qrToken]);
+    const inviteUrl = new URL(window.location.pathname, window.location.origin);
+    inviteUrl.searchParams.set('register', 'true');
+    inviteUrl.searchParams.set('join', JSON.stringify({
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      avatarId: user.avatarId,
+      qrToken: user.qrToken
+    }));
+
+    QRCode.toDataURL(inviteUrl.toString(), {
+      width: 320,
+      margin: 4,
+      errorCorrectionLevel: 'H',
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    }).then(setQrDataUrl);
+  }, [user.id, user.name, user.role, user.avatarId, user.qrToken]);
 
   const copyShareLink = () => {
     navigator.clipboard?.writeText(`https://techfestjos.org/operator/${user.ticketId || 'JTF26'}`);
@@ -173,7 +180,7 @@ export const OperatorCardModal = () => {
             {qrDataUrl && (
               <div style={{
                 padding: '8px',
-                background: '#070A08',
+                background: '#FFFFFF',
                 borderRadius: '14px',
                 border: '1px solid rgba(0, 230, 118, 0.3)',
                 boxShadow: '0 0 15px rgba(0, 230, 118, 0.15)',
@@ -182,7 +189,7 @@ export const OperatorCardModal = () => {
                 <img 
                   src={qrDataUrl} 
                   alt="Operator QR" 
-                  style={{ width: '120px', height: '120px', display: 'block' }} 
+                  style={{ width: '200px', height: '200px', display: 'block', imageRendering: 'pixelated' }} 
                 />
               </div>
             )}

@@ -337,9 +337,13 @@ export const AppProvider = ({ children }) => {
         throw new Error('The invite QR does not contain a valid operator profile.');
       }
 
-      setSignupInvite(profile);
-      setSignupMode(true);
-      setActiveModal('signup');
+      if (user && user.email && user.isOnboarded) {
+        handleQrScan(window.location.href);
+      } else {
+        setSignupInvite(profile);
+        setSignupMode(true);
+        setActiveModal('signup');
+      }
       window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
     } catch (error) {
       showToast('Invite Link Invalid', error.message, 'error');
