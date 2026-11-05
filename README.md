@@ -1,6 +1,6 @@
 # TechFest Quest
 
-TechFest Quest is a React/Vite event application backed by Neon Auth and Neon Postgres (via the Neon Data API). Accounts use email one-time codes; attendee profiles, connections, event check-ins, quiz results, and scores are shared server-side. Point awards and quiz scoring are performed by database functions, not trusted to the browser.
+TechFest Quest is a React/Vite event application backed by Neon Auth and Neon Postgres (via the Neon Data API). Accounts use email and password; attendees can start immediately, and organizer access requires a verified email (verify once with the emailed sign-in code). attendee profiles, connections, event check-ins, quiz results, and scores are shared server-side. Point awards and quiz scoring are performed by database functions, not trusted to the browser.
 
 ## Local setup
 

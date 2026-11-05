@@ -379,6 +379,39 @@ export const AppProvider = ({ children }) => {
     return true;
   };
 
+  const signUpWithPassword = async ({ name, email, password, role }) => {
+    if (!isSupabaseConfigured) return false;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
+      email: normalizedEmail, name: String(name || '').trim(), role
+    }));
+    const { data, error } = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password,
+      options: { data: { name: String(name || '').trim() } }
+    });
+    if (error) {
+      showError('Could not create account', error);
+      return false;
+    }
+    if (data?.session) setSession(data.session);
+    return true;
+  };
+
+  const signInWithPassword = async ({ email, password }) => {
+    if (!isSupabaseConfigured) return false;
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: String(email || '').trim().toLowerCase(),
+      password
+    });
+    if (error) {
+      showError('Could not sign in', error);
+      return false;
+    }
+    if (data?.session) setSession(data.session);
+    return true;
+  };
+
   const verifyLoginCode = async (email, token) => {
     const { data, error } = await supabase.auth.verifyOtp({
       email: String(email || '').trim().toLowerCase(),
@@ -723,6 +756,8 @@ export const AppProvider = ({ children }) => {
     startSignup: () => { setSignupInvite(null); setActiveModal('signup'); },
     cancelSignup: () => setActiveModal(null),
     sendLoginCode,
+    signInWithPassword,
+    signUpWithPassword,
     verifyLoginCode,
     signOut,
     modalData,

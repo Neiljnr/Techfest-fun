@@ -157,7 +157,6 @@ set search_path = ''
 as $$
 declare
   account_email text;
-  account_verified boolean;
   profile_name text;
   profile_role text;
   result public.profiles;
@@ -166,9 +165,8 @@ begin
   select * into result from public.profiles where id = auth.uid();
   if found then return result; end if;
 
-  select email, "emailVerified" into account_email, account_verified
-  from neon_auth."user" where id = auth.uid();
-  if not found or not account_verified then raise exception 'A verified email is required'; end if;
+  select email into account_email from neon_auth."user" where id = auth.uid();
+  if not found then raise exception 'Account not found'; end if;
 
   profile_name := left(trim(coalesce(nullif(trim(p_name), ''), split_part(account_email, '@', 1))), 60);
   if profile_name = '' then profile_name := 'Attendee'; end if;
@@ -182,7 +180,7 @@ begin
   on conflict (id) do nothing;
   insert into public.participant_state (user_id) values (auth.uid()) on conflict (user_id) do nothing;
   insert into public.point_ledger (user_id, event_key, title, points, stage, reason)
-  values (auth.uid(), 'profile-created', 'Create attendee profile', 5, 1, 'Verified email registration')
+  values (auth.uid(), 'profile-created', 'Create attendee profile', 5, 1, 'Account registration')
   on conflict (user_id, event_key) do nothing;
 
   select * into result from public.profiles where id = auth.uid();

@@ -4,19 +4,31 @@ import { useApp } from '../context/AppContext';
 import { ROLES } from '../data/avatars';
 
 export const SignupModal = () => {
-  const { sendLoginCode, verifyLoginCode, showToast } = useApp();
+  const { sendLoginCode, verifyLoginCode, signInWithPassword, signUpWithPassword, showToast } = useApp();
   const [createAccount, setCreateAccount] = useState(true);
   const [step, setStep] = useState('email');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState('builder');
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSendCode = async (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setIsSubmitting(true);
-    const sent = await sendLoginCode({ name, email, role, createAccount });
+    if (createAccount) await signUpWithPassword({ name, email, password, role });
+    else await signInWithPassword({ email, password });
+    setIsSubmitting(false);
+  };
+
+  const handleSendCode = async () => {
+    if (!email.trim()) {
+      showToast('Email required', 'Enter your email first, then request a code.', 'warning');
+      return;
+    }
+    setIsSubmitting(true);
+    const sent = await sendLoginCode({ name, email, role, createAccount: false });
     setIsSubmitting(false);
     if (sent) setStep('verification');
   };
@@ -47,9 +59,9 @@ export const SignupModal = () => {
         </div>
 
         {step === 'email' ? (
-          <form onSubmit={handleSendCode} className="modal-body" style={{ gap: '16px' }}>
+          <form onSubmit={handleSubmit} className="modal-body" style={{ gap: '16px' }}>
             <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-              Use your email to create a verified account or sign in. Scores and event activity are stored on the event server.
+              Create an account with your email and a password, or sign in. Scores and event activity are stored on the event server.
             </p>
             {createAccount && (
               <>
@@ -71,14 +83,26 @@ export const SignupModal = () => {
               <input type="email" autoComplete="email" required maxLength={120} value={email}
                 onChange={event => setEmail(event.target.value)} placeholder="you@example.com" style={inputStyle} />
             </label>
+            <label style={labelStyle}>
+              Password
+              <input type="password" required minLength={8} maxLength={128} value={password}
+                autoComplete={createAccount ? 'new-password' : 'current-password'}
+                onChange={event => setPassword(event.target.value)} placeholder="At least 8 characters" style={inputStyle} />
+            </label>
             <button type="submit" className="pill-btn-action pill-btn-primary" disabled={isSubmitting}>
-              <MailCheck size={16} />
-              <span>{isSubmitting ? 'Sending…' : 'Email me a verification code'}</span>
+              <span>{isSubmitting ? 'Please wait…' : createAccount ? 'Create account' : 'Sign in'}</span>
             </button>
             <button type="button" className="pill-btn-action pill-btn-secondary"
               onClick={() => setCreateAccount(value => !value)}>
               {createAccount ? 'Already registered? Sign in' : 'New attendee? Create an account'}
             </button>
+            {!createAccount && (
+              <button type="button" className="pill-btn-action pill-btn-secondary" disabled={isSubmitting}
+                onClick={handleSendCode}>
+                <MailCheck size={16} />
+                <span>Email me a sign-in code instead</span>
+              </button>
+            )}
           </form>
         ) : (
           <form onSubmit={handleVerifyCode} className="modal-body" style={{ gap: '16px' }}>
