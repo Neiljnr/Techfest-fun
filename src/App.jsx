@@ -6,7 +6,6 @@ import { HomeScreen } from './components/HomeScreen';
 import { PeopleScreen } from './components/PeopleScreen';
 import { PlugScreen } from './components/PlugScreen';
 import { LeaderboardScreen } from './components/LeaderboardScreen';
-import { AdminDashboard } from './components/AdminDashboard';
 import { VenueProjectorView } from './components/VenueProjectorView';
 
 // Modals
@@ -19,13 +18,11 @@ import { ProfileModal } from './components/ProfileModal';
 import { SignupModal } from './components/SignupModal';
 
 import { 
-  Sparkles, 
   Smartphone, 
   Maximize2, 
   CheckCircle, 
   AlertTriangle, 
-  Info,
-  Check
+  Info
 } from 'lucide-react';
 
 export const App = () => {
@@ -49,18 +46,12 @@ export const App = () => {
     <div className="app-container">
       {/* Outer Shell */}
       <div 
-        className={`app-wrapper ${isVenueMode || wideMode ? 'venue-fullscreen' : ''}`}
+        className={`app-wrapper ${isVenueMode ? 'venue-fullscreen' : wideMode ? 'wide-mode' : ''}`}
         style={wideMode && !isVenueMode ? { maxWidth: '720px' } : undefined}
       >
         {/* Floating Desktop Viewport Switcher */}
         {!isVenueMode && (
-          <div style={{
-            position: 'absolute',
-            top: '8px',
-            right: '-110px',
-            display: 'none',
-            '@media (min-width: 900px)': { display: 'flex' }
-          }} className="desktop-toggle-hint">
+          <div className="desktop-toggle-hint">
             <button
               onClick={() => setWideMode(!wideMode)}
               style={{
@@ -107,11 +98,10 @@ export const App = () => {
         {currentTab === 'people' && <PeopleScreen />}
         {currentTab === 'plug' && <PlugScreen />}
         {currentTab === 'board' && <LeaderboardScreen />}
-        {currentTab === 'admin' && <AdminDashboard />}
         {currentTab === 'venue' && <VenueProjectorView />}
 
-        {/* Bottom Dock Navigation (Hidden in venue projector or admin mode) */}
-        {!isVenueMode && currentTab !== 'admin' && <BottomNav />}
+        {/* Bottom Dock Navigation (Hidden in venue projector mode) */}
+        {!isVenueMode && <BottomNav />}
 
         {/* Active Modals */}
         {activeModal === 'scanner' && <ScannerModal />}

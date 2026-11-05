@@ -38,13 +38,20 @@ export const HomeScreen = () => {
   const [copiedRef, setCopiedRef] = useState(false);
 
   const clearedCount = getClearedStagesCount();
-  const referralLink = `https://techfestjos.org/quest?ref=${user.ticketId || 'JTF26-OP'}`;
+  const referralLink = 'https://techfestjos.org/quest';
 
-  const copyReferral = () => {
-    navigator.clipboard?.writeText(referralLink);
-    setCopiedRef(true);
-    showToast('Link Copied!', 'Share your operator pass with fellow builders (+10 pts each).', 'success');
-    setTimeout(() => setCopiedRef(false), 2500);
+  const copyShareLink = async () => {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard access is unavailable in this browser.');
+      }
+      await navigator.clipboard.writeText(referralLink);
+      setCopiedRef(true);
+      showToast('Link Copied!', 'Share the TechFest Quest demo with fellow builders.', 'success');
+      setTimeout(() => setCopiedRef(false), 2500);
+    } catch (error) {
+      showToast('Could Not Copy Link', 'Copy the event link from the field manually.', 'error');
+    }
   };
 
   const shareWhatsApp = () => {
@@ -98,14 +105,16 @@ export const HomeScreen = () => {
             <Sparkles size={12} />
             Jos TechFest 2026 · AI x Industry
           </span>
-          <span 
+          <button
+            type="button"
             className="rank-link-badge"
             onClick={() => setCurrentTab('board')}
             title="Click to view full leaderboard"
+            aria-label={`View leaderboard, current rank ${userRankIndex}`}
           >
             Rank #{userRankIndex}
             <ChevronRight size={14} />
-          </span>
+          </button>
         </div>
 
         <div>
@@ -129,18 +138,22 @@ export const HomeScreen = () => {
               width: '8px',
               height: '8px',
               borderRadius: '50%',
-              backgroundColor: '#00E676',
-              boxShadow: '0 0 8px #00E676'
+              backgroundColor: '#FFD700',
+              boxShadow: '0 0 8px #FFD700'
             }} />
             <span style={{ fontSize: '12.5px', color: '#E0E7E2' }}>
-              Checked in at Sarau Event Center
+              Demo profile · event check-in not verified
             </span>
           </div>
           <span style={{ fontSize: '11px', color: 'var(--green-primary)', fontWeight: '700' }}>
-            TICKET: FREE
+            DEMO
           </span>
         </div>
       </div>
+
+      <p className="demo-notice">
+        Prototype demo: profiles and scores are stored in this browser and are not verified for official event scoring.
+      </p>
 
       {/* 2. Quest Tracker Card (H3) */}
       <div className="quest-card stage-tracker-card">
@@ -161,9 +174,11 @@ export const HomeScreen = () => {
             const isActive = nextStage.id === stg.id;
 
             return (
-              <div 
+              <button
+                type="button"
                 key={stg.id} 
                 className={`stage-node-item ${isCleared ? 'cleared' : ''} ${isActive ? 'active' : ''}`}
+                aria-label={`Open stage ${stg.number}: ${stg.title}`}
                 onClick={() => {
                   if (stg.number === 3) {
                     setActiveModal('blitz');
@@ -192,7 +207,7 @@ export const HomeScreen = () => {
                   )}
                 </div>
                 <span className="stage-label-text">{stg.title}</span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -273,8 +288,9 @@ export const HomeScreen = () => {
 
       {/* 4. Live Signal Drop Banner (Surprise Flash Quest) */}
       {activeFlashDrop && (
-        <div 
-          className="quest-card"
+        <button
+          type="button"
+          className="quest-card flash-drop-card"
           style={{
             background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.12) 0%, rgba(255, 145, 0, 0.08) 100%)',
             borderColor: 'rgba(255, 215, 0, 0.35)',
@@ -313,13 +329,15 @@ export const HomeScreen = () => {
             <span>📍 {activeFlashDrop.hint}</span>
             <span style={{ color: '#FFD700', fontWeight: '700' }}>Tap to Scan Code</span>
           </div>
-        </div>
+        </button>
       )}
 
       {/* 5. Quick Networking Bar (H6) */}
       <div className="quick-qr-row">
-        <div 
+        <button
+          type="button"
           className="quick-qr-card"
+          aria-label="Open my operator QR card"
           onClick={() => setActiveModal('operator_card')}
         >
           <div className="quick-qr-icon">
@@ -329,10 +347,12 @@ export const HomeScreen = () => {
             <h4>My QR Card</h4>
             <p>Show for 2-way connect</p>
           </div>
-        </div>
+        </button>
 
-        <div 
+        <button
+          type="button"
           className="quick-qr-card"
+          aria-label="Find people"
           onClick={() => setCurrentTab('people')}
         >
           <div className="quick-qr-icon" style={{ background: 'rgba(0, 176, 255, 0.12)', color: '#00B0FF' }}>
@@ -342,16 +362,16 @@ export const HomeScreen = () => {
             <h4>Find People</h4>
             <p>Cross-role bonuses</p>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* 6. Referral Card (H5) */}
       <div className="quest-card referral-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h4 style={{ fontSize: '15px', fontWeight: '700' }}>Refer Fellow Builders</h4>
+            <h4 style={{ fontSize: '15px', fontWeight: '700' }}>Share TechFest Quest</h4>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Earn +10 points for every friend who checks in at Sarau Event Center (up to 5).
+              Invite friends to try the demo. Referral tracking and points are not enabled.
             </p>
           </div>
           <span style={{
@@ -362,7 +382,7 @@ export const HomeScreen = () => {
             padding: '4px 8px',
             borderRadius: '8px'
           }}>
-            +10 PTS
+            DEMO LINK
           </span>
         </div>
 
@@ -373,7 +393,7 @@ export const HomeScreen = () => {
             value={referralLink} 
             className="referral-input" 
           />
-          <button className="btn-copy" onClick={copyReferral}>
+          <button className="btn-copy" onClick={copyShareLink}>
             {copiedRef ? 'Copied!' : 'Copy'}
           </button>
         </div>
@@ -383,7 +403,7 @@ export const HomeScreen = () => {
             <MessageCircle size={15} />
             <span>WhatsApp</span>
           </button>
-          <button className="share-btn" onClick={copyReferral}>
+          <button className="share-btn" onClick={copyShareLink}>
             <Share2 size={15} />
             <span>Share Link</span>
           </button>
@@ -397,9 +417,9 @@ export const HomeScreen = () => {
             <Award size={18} color="#FFD700" />
             <h3>Leaderboard Top 5</h3>
           </div>
-          <span className="text-link" onClick={() => setCurrentTab('board')}>
+          <button type="button" className="text-link" onClick={() => setCurrentTab('board')}>
             See board
-          </span>
+          </button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

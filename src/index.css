@@ -28,7 +28,7 @@
   --text-white: #FFFFFF;
   --text-light: #E0E7E2;
   --text-muted: #8B9990;
-  --text-dim: #546359;
+  --text-dim: #8B9990;
 
   /* Borders & Glass */
   --border-subtle: rgba(255, 255, 255, 0.08);
@@ -50,6 +50,14 @@
   margin: 0;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--green-primary);
+  outline-offset: 3px;
 }
 
 html, body {
@@ -116,6 +124,20 @@ body::before {
   border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.desktop-toggle-hint {
+  display: none;
+  position: absolute;
+  top: 8px;
+  right: -110px;
+  z-index: 60;
+}
+
+@media (min-width: 900px) {
+  .desktop-toggle-hint {
+    display: flex;
+  }
+}
+
 /* Fullscreen Venue Mode override */
 .app-wrapper.venue-fullscreen {
   max-width: 100% !important;
@@ -142,6 +164,11 @@ body::before {
   align-items: center;
   gap: 10px;
   cursor: pointer;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
 }
 
 .avatar-thumbnail {
@@ -294,6 +321,14 @@ h1, h2, h3, h4, h5 {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(0, 230, 118, 0.05);
 }
 
+.flash-drop-card {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 /* Welcome Card */
 .welcome-card {
   display: flex;
@@ -335,6 +370,7 @@ h1, h2, h3, h4, h5 {
   border: 1px solid var(--border-subtle);
   cursor: pointer;
   transition: background 0.2s;
+  font-family: inherit;
 }
 
 .rank-link-badge:hover {
@@ -390,6 +426,15 @@ h1, h2, h3, h4, h5 {
   padding: 0 8px;
 }
 
+.demo-notice {
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 215, 0, 0.25);
+  border-radius: 10px;
+  background: rgba(255, 215, 0, 0.06);
+  color: #E8DDAA;
+  font-size: 11px;
+}
+
 /* Connecting line behind stages */
 .stages-nodes-row::before {
   content: '';
@@ -411,6 +456,11 @@ h1, h2, h3, h4, h5 {
   z-index: 2;
   cursor: pointer;
   transition: transform 0.2s;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
 }
 
 .stage-node-item:hover {
@@ -580,6 +630,10 @@ h1, h2, h3, h4, h5 {
   gap: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
 }
 
 .quick-qr-card:hover {
@@ -709,6 +763,11 @@ h1, h2, h3, h4, h5 {
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
 }
 
 .text-link:hover {

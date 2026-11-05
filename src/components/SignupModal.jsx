@@ -15,12 +15,12 @@ export const SignupModal = () => {
   };
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="signup-title">
       <div className="modal-sheet" style={{ maxHeight: '90vh', background: '#090D0B' }}>
         <div className="modal-header">
           <div className="modal-title-box">
             <UserPlus size={20} color="var(--green-primary)" />
-            <h3 className="modal-title">Create your operator account</h3>
+            <h3 className="modal-title" id="signup-title">Create your demo profile</h3>
           </div>
           <button className="modal-close-btn" onClick={cancelSignup} aria-label="Close signup">
             <X size={18} />
@@ -34,13 +34,13 @@ export const SignupModal = () => {
               <div>
                 <strong style={{ display: 'block' }}>Invited by {signupInvite.name}</strong>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  Your accounts will be connected after signup.
+                  Your demo profiles will be linked in this browser.
                 </span>
               </div>
             </div>
           ) : (
             <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-              This signup works with a real Gmail account. You can continue without a QR invite.
+              This is a local demo profile. A Gmail address format is required, but ownership is not verified.
             </p>
           )}
 
@@ -81,7 +81,7 @@ export const SignupModal = () => {
           </label>
 
           <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            This app stores the signup locally in the browser so you can test a real Gmail onboarding flow.
+            Your profile and scores are stored only in this browser. Do not use this prototype for official event scoring.
           </p>
 
           <button

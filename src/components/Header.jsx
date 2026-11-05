@@ -11,6 +11,7 @@ export const Header = () => {
     isOnline,
     toggleNetwork,
     offlineQueue,
+    syncOfflineQueue,
     setActiveModal,
     setCurrentTab
   } = useApp();
@@ -18,10 +19,12 @@ export const Header = () => {
   return (
     <header className="app-header">
       {/* Left: User Avatar & Name */}
-      <div 
+      <button
+        type="button"
         className="header-user-group"
         onClick={() => setActiveModal('profile')}
         title="View & Edit Profile"
+        aria-label="View and edit profile"
       >
         <div 
           className="avatar-thumbnail"
@@ -33,20 +36,22 @@ export const Header = () => {
             {currentRank.title}
           </span>
         </div>
-      </div>
+      </button>
 
       {/* Right: Points, Network Status & QR trigger */}
       <div className="header-actions-group">
         {/* Offline / Online simulator badge */}
         <button
           className={`network-badge ${isOnline ? 'online' : 'offline'}`}
-          onClick={toggleNetwork}
-          title={isOnline ? 'Tap to simulate weak venue network' : 'Offline mode active: tap to reconnect'}
+          onClick={isOnline && offlineQueue.length > 0 ? syncOfflineQueue : toggleNetwork}
+          title={isOnline
+            ? offlineQueue.length > 0 ? 'Tap to retry queued scans' : 'Tap to simulate weak venue network'
+            : 'Offline mode active: tap to reconnect'}
         >
           {isOnline ? (
             <>
               <Wifi size={12} />
-              <span>Online</span>
+              <span>{offlineQueue.length > 0 ? `${offlineQueue.length} Queued` : 'Online'}</span>
             </>
           ) : (
             <>
@@ -57,14 +62,16 @@ export const Header = () => {
         </button>
 
         {/* Current Points Pill */}
-        <div 
+        <button
+          type="button"
           className="points-pill"
           onClick={() => setCurrentTab('board')}
           title="Total automation points earned"
+          aria-label={`View leaderboard, ${points} points`}
         >
           <Star size={15} fill="#00E676" stroke="#00E676" />
           <span>{points}</span>
-        </div>
+        </button>
 
         {/* My QR Quick Button */}
         <button 

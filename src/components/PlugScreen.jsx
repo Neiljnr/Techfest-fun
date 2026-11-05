@@ -19,14 +19,13 @@ export const PlugScreen = () => {
     connections, 
     pendingHandshakes, 
     confirmHandshake, 
-    addPoints,
-    showToast,
-    startSignup
+    startSignup,
+    roundtableCheckedIn,
+    checkInRoundtable
   } = useApp();
 
   const [qrUrl, setQrUrl] = useState('');
   const [qrError, setQrError] = useState('');
-  const [roundtableCheckedIn, setRoundtableCheckedIn] = useState(false);
 
   // Generate attendee's own QR code
   useEffect(() => {
@@ -65,19 +64,6 @@ export const PlugScreen = () => {
       isCancelled = true;
     };
   }, [user.id, user.name, user.role, user.avatarId, user.qrToken]);
-
-  const handleRoundtableCheckin = () => {
-    if (roundtableCheckedIn) return;
-    setRoundtableCheckedIn(true);
-    addPoints(
-      'day2-roundtable-1',
-      'Day 2 Founder Roundtable Check-In',
-      20,
-      2,
-      'Executive roundtable networking check-in'
-    );
-    showToast('Roundtable Verified!', '+20 pts awarded for Day 2 Founder session.', 'success');
-  };
 
   return (
     <div className="main-content">
@@ -263,6 +249,9 @@ export const PlugScreen = () => {
         <p style={{ fontSize: '12px', color: 'var(--text-light)' }}>
           Exclusive executive track for CEOs, CTOs and founders at Sarau VIP lounge.
         </p>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+          Demo only: this check-in is stored in this browser and does not verify event attendance.
+        </p>
 
         {roundtableCheckedIn ? (
           <div style={{
@@ -274,15 +263,15 @@ export const PlugScreen = () => {
             fontWeight: '700'
           }}>
             <Check size={16} strokeWidth={3} />
-            Checked in to Day 2 Roundtable
+            Demo check-in recorded
           </div>
         ) : (
           <button
             className="pill-btn-action pill-btn-primary"
             style={{ fontSize: '13px' }}
-            onClick={handleRoundtableCheckin}
+            onClick={checkInRoundtable}
           >
-            Check In to Founder Roundtable
+            Record Demo Check-In
           </button>
         )}
       </div>

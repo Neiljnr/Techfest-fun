@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { STAGES, INITIAL_STAGE1_QUESTS } from '../data/quests';
 import { PARTNERS } from '../data/partners';
@@ -79,6 +79,8 @@ const clearDemoStorage = () => {
       'techfest_partners',
       'techfest_sessions',
       'techfest_drops',
+      'techfest_roundtable_checkin',
+      'techfest_offline_queue',
       'techfest_visitor_name'
     ];
     keys.forEach(key => localStorage.removeItem(key));
@@ -213,6 +215,16 @@ export const AppProvider = ({ children }) => {
 
   // Incoming 2-way pending handshake requests
   const [pendingHandshakes, setPendingHandshakes] = useState([]);
+  const [roundtableCheckedIn, setRoundtableCheckedIn] = useState(
+    () => {
+      if (readStorage('techfest_roundtable_checkin', 'false') === 'true') return true;
+      const savedLedger = readStoredJson('techfest_ledger', []);
+      return Array.isArray(savedLedger) && savedLedger.some(
+        entry => entry.questId === 'day2-roundtable-1'
+      );
+    }
+  );
+  const roundtableCheckedInRef = useRef(roundtableCheckedIn);
 
   // Stage 3: Prompt Blitz status
   const [blitzState, setBlitzState] = useState(() => {
@@ -258,15 +270,17 @@ export const AppProvider = ({ children }) => {
   });
 
   // Signal Drops catalog (Admin can add new)
-  const [signalDrops, setSignalDrops] = useState(INITIAL_SIGNAL_DROPS);
+  const signalDrops = INITIAL_SIGNAL_DROPS;
 
   // Network simulation & Offline scan queue
   const [isOnline, setIsOnline] = useState(true);
-  const [offlineQueue, setOfflineQueue] = useState([]);
+  const [offlineQueue, setOfflineQueue] = useState(
+    () => readStoredJson('techfest_offline_queue', [])
+  );
   const [toastMessage, setToastMessage] = useState(null);
 
   // Navigation & Modals
-  const [currentTab, setCurrentTab] = useState('home'); // 'home', 'people', 'plug', 'board', 'admin', 'venue'
+  const [currentTab, setCurrentTab] = useState('home'); // 'home', 'people', 'plug', 'board', 'venue'
   const [activeModal, setActiveModal] = useState(null); // 'scanner', 'stage_detail', 'blitz', 'partner_detail', 'operator_card', 'privacy', 'profile'
   const [modalData, setModalData] = useState(null);
   const [signupMode, setSignupMode] = useState(false);
@@ -308,6 +322,10 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     writeStorage('techfest_drops', JSON.stringify(claimedDrops));
   }, [claimedDrops]);
+
+  useEffect(() => {
+    writeStorage('techfest_offline_queue', JSON.stringify(offlineQueue));
+  }, [offlineQueue]);
 
   useEffect(() => {
     const joinData = new URLSearchParams(window.location.search).get('join');
@@ -495,7 +513,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Process a QR code scan
-  const handleQrScan = (rawCode) => {
+  const handleQrScan = (rawCode, isSyncingOffline = false) => {
     playTone('scan');
 
     const isGuestUser = !user || !user.email || !user.isOnboarded;
@@ -529,13 +547,15 @@ export const AppProvider = ({ children }) => {
     }
 
     // If offline, queue the scan!
-    if (!isOnline) {
+    if (!isOnline && !isSyncingOffline) {
       const queueItem = {
         id: `offline-${Date.now()}`,
         code: rawCode,
         timestamp: new Date().toLocaleTimeString()
       };
-      setOfflineQueue(prev => [...prev, queueItem]);
+      setOfflineQueue(prev => (
+        prev.some(item => item.code === rawCode) ? prev : [...prev, queueItem]
+      ));
       showToast(
         'Offline Scan Saved!',
         'No network, no wahala. We saved it offline & will sync when you are back.',
@@ -701,7 +721,7 @@ export const AppProvider = ({ children }) => {
       city: 'Jos',
       bio: '',
       qrToken: `JTF26-ATT-${slug}-${Date.now().toString().slice(-6)}`,
-      isCheckedIn: true,
+      isCheckedIn: false,
       isOnboarded: true,
       hideFromPublicBoard: false
     };
@@ -733,6 +753,9 @@ export const AppProvider = ({ children }) => {
       speedBonusTotal: 0,
       completedAt: null
     });
+    roundtableCheckedInRef.current = false;
+    setRoundtableCheckedIn(false);
+    writeStorage('techfest_roundtable_checkin', 'false');
 
     if (signupInvite) {
       const isDifferentRole = signupInvite.role !== newUser.role;
@@ -772,13 +795,13 @@ export const AppProvider = ({ children }) => {
           isReversed: false
         }
       ]);
-      showToast('Account Created!', `You’re connected with ${signupInvite.name} and saved with your real Gmail account.`, 'success');
+      showToast('Demo account created', `You’re connected with ${signupInvite.name}. This profile is stored only in this browser.`, 'success');
     } else {
       setConnections([]);
       setPartnerVisits({});
       setCapturedSessions([]);
       setClaimedDrops([]);
-      showToast('Account Created!', `Your real Gmail account for ${normalizedEmail} is now saved in this browser.`, 'success');
+      showToast('Demo account created', `The Gmail address format was accepted but not verified. Your profile is stored only in this browser.`, 'success');
     }
 
     setSignupMode(false);
@@ -794,13 +817,27 @@ export const AppProvider = ({ children }) => {
       return;
     }
 
-    const count = offlineQueue.length;
-    offlineQueue.forEach(item => {
-      handleQrScan(item.code);
+    const queuedItems = [...offlineQueue];
+    const failedIds = [];
+
+    queuedItems.forEach(item => {
+      const result = handleQrScan(item.code, true);
+      if (!result || !result.success || result.offline) {
+        failedIds.push(item.id);
+      }
     });
 
-    setOfflineQueue([]);
-    showToast('Offline Scans Synced!', `Successfully synchronized ${count} offline scan(s). Points updated!`, 'success');
+    const syncedCount = queuedItems.length - failedIds.length;
+    setOfflineQueue(prev => prev.filter(item => failedIds.includes(item.id)));
+    if (failedIds.length > 0) {
+      showToast(
+        'Some Scans Need Attention',
+        `${syncedCount} scan(s) synced. ${failedIds.length} unrecognized scan(s) remain queued.`,
+        'warning'
+      );
+    } else {
+      showToast('Offline Scans Synced!', `Successfully synchronized ${syncedCount} offline scan(s).`, 'success');
+    }
   };
 
   // Toggle Network Online/Offline
@@ -817,43 +854,46 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Admin audit ledger reversal
-  const reverseLedgerEntry = (entryId, reason) => {
-    setLedger(prev =>
-      prev.map(item => {
-        if (item.id === entryId) {
-          setPoints(p => Math.max(0, p - item.points));
-          return { ...item, isReversed: true, reversalReason: reason };
-        }
-        return item;
-      })
+  const checkInRoundtable = () => {
+    if (roundtableCheckedInRef.current) {
+      showToast('Already Checked In', 'This browser has already recorded the roundtable check-in.', 'warning');
+      return;
+    }
+
+    roundtableCheckedInRef.current = true;
+    setRoundtableCheckedIn(true);
+    writeStorage('techfest_roundtable_checkin', 'true');
+    addPoints(
+      'day2-roundtable-1',
+      'Day 2 Founder Roundtable Check-In',
+      20,
+      2,
+      'Executive roundtable networking check-in'
     );
-    showToast('Points Reversed', `Entry ${entryId} has been revoked with audit note.`, 'info');
-  };
-
-  // Trigger a new surprise signal drop
-  const triggerNewSignalDrop = (dropData) => {
-    const newDrop = {
-      id: `drop-${Date.now()}`,
-      title: dropData.title || 'Flash Arena Challenge',
-      badge: '⚡ LIVE DROP',
-      points: dropData.points || 20,
-      code: `JTF26-SIGNAL-CUSTOM-${Date.now()}`,
-      description: dropData.description || 'Announced from the main stage at Sarau Event Center!',
-      hint: dropData.hint || 'Sarau Stage Floor',
-      active: true,
-      claimedCount: 0,
-      limit: dropData.limit || 50,
-      expiresIn: 'Active Now'
-    };
-
-    setSignalDrops(prev => [newDrop, ...prev]);
-    showToast('⚡ Signal Drop Broadcasted!', `Live quest: "${newDrop.title}" (+${newDrop.points} pts) is live!`, 'warning');
+    showToast('Roundtable Check-In Recorded', '+20 demo points awarded.', 'success');
   };
 
   // Nigeria Data Protection Act (NDPA) Compliant one-tap deletion
   const deleteMyData = () => {
-    localStorage.clear();
+    try {
+      [
+        'techfest_user',
+        'techfest_points',
+        'techfest_ledger',
+        'techfest_stage1',
+        'techfest_connections',
+        'techfest_blitz',
+        'techfest_partners',
+        'techfest_sessions',
+        'techfest_drops',
+        'techfest_roundtable_checkin',
+        'techfest_offline_queue',
+        'techfest_visitor_name'
+      ].forEach(key => localStorage.removeItem(key));
+    } catch (error) {
+      showToast('Could Not Delete All Data', 'Browser storage restrictions prevented complete deletion.', 'error');
+      return;
+    }
     setPoints(0);
     setLedger([]);
     setConnections([]);
@@ -862,6 +902,9 @@ export const AppProvider = ({ children }) => {
     setPartnerVisits({});
     setCapturedSessions([]);
     setClaimedDrops([]);
+    setOfflineQueue([]);
+    roundtableCheckedInRef.current = false;
+    setRoundtableCheckedIn(false);
     setUser({
       id: `op-new-${Date.now()}`,
       name: 'Guest Builder',
@@ -895,7 +938,6 @@ export const AppProvider = ({ children }) => {
         points,
         addPoints,
         ledger,
-        reverseLedgerEntry,
         currentRank,
         avatarMeta,
         roleMeta,
@@ -911,12 +953,13 @@ export const AppProvider = ({ children }) => {
         capturedSessions,
         claimedDrops,
         signalDrops,
-        triggerNewSignalDrop,
         handleQrScan,
         isOnline,
         toggleNetwork,
         offlineQueue,
         syncOfflineQueue,
+        roundtableCheckedIn,
+        checkInRoundtable,
         toastMessage,
         showToast,
         currentTab,

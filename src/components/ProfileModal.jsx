@@ -19,7 +19,6 @@ export const ProfileModal = () => {
     user, 
     setUser, 
     setActiveModal, 
-    setCurrentTab, 
     deleteMyData, 
     showToast 
   } = useApp();
@@ -44,7 +43,7 @@ export const ProfileModal = () => {
   };
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="profile-title">
       <div 
         className="modal-sheet" 
         style={{ 
@@ -57,7 +56,7 @@ export const ProfileModal = () => {
         <div className="modal-header">
           <div className="modal-title-box">
             <User size={20} color="var(--green-primary)" />
-            <h3 className="modal-title">Operator Profile & Settings</h3>
+            <h3 className="modal-title" id="profile-title">Operator Profile & Settings</h3>
           </div>
           <button 
             className="modal-close-btn"
@@ -141,14 +140,19 @@ export const ProfileModal = () => {
               {AVATARS.map(av => {
                 const isSelected = avatarId === av.id;
                 return (
-                  <div
+                  <button
+                    type="button"
+                    aria-label={`Choose ${av.name} avatar`}
+                    aria-pressed={isSelected}
                     key={av.id}
                     onClick={() => setAvatarId(av.id)}
                     style={{
                       width: '44px',
                       height: '44px',
+                      padding: 0,
                       borderRadius: '50%',
                       border: isSelected ? '2.5px solid var(--green-primary)' : '1px solid rgba(255, 255, 255, 0.1)',
+                      background: 'transparent',
                       overflow: 'hidden',
                       cursor: 'pointer',
                       transform: isSelected ? 'scale(1.1)' : 'scale(1)',
@@ -194,37 +198,6 @@ export const ProfileModal = () => {
             <Save size={16} />
             <span>Save Profile Parameters</span>
           </button>
-
-          {/* Organizer Console Shortcut */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.03)',
-            borderRadius: '12px',
-            padding: '12px',
-            border: '1px solid var(--border-subtle)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <div>
-              <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#FFF' }}>
-                Organizer Admin Desk
-              </span>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Broadcast drops, view audit log & supervise finale
-              </p>
-            </div>
-            <button
-              type="button"
-              className="pill-btn-action pill-btn-secondary"
-              style={{ width: 'auto', padding: '6px 12px', fontSize: '11.5px' }}
-              onClick={() => {
-                setActiveModal(null);
-                setCurrentTab('admin');
-              }}
-            >
-              Open Desk
-            </button>
-          </div>
 
           {/* Privacy & NDPA Data Deletion */}
           <div style={{
