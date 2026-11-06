@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Star, Wifi, WifiOff, QrCode, Shield, Bell } from 'lucide-react';
+import { Star, Wifi, WifiOff, Shield, Bell } from 'lucide-react';
 
 export const Header = () => {
   const {
@@ -105,15 +105,6 @@ export const Header = () => {
         >
           <Star size={15} fill="#00E676" stroke="#00E676" />
           <span>{points}</span>
-        </button>
-
-        {/* My QR Quick Button */}
-        <button 
-          className="header-icon-btn"
-          onClick={() => setActiveModal('operator_card')}
-          title="Open My Operator Card & QR"
-        >
-          <QrCode size={18} />
         </button>
       </div>
     </header>

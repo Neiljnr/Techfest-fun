@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const PeopleScreen = () => {
-  const { user, attendees, connections, connectToAttendee } = useApp();
+  const { user, attendees, connections } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
 
@@ -33,9 +33,9 @@ export const PeopleScreen = () => {
       {/* Search & Header */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div>
-          <h2 style={{ fontSize: '20px', fontWeight: '800' }}>People & Operators</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: '800' }}>People</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            Connect with builders in Sarau Hall. <strong>Cross-role connections earn +15 pts!</strong>
+            See who is at the event, then find them and meet. Scan their QR in person to connect: <strong>+10 pts, or +15 across roles.</strong>
           </p>
         </div>
 
@@ -125,7 +125,7 @@ export const PeopleScreen = () => {
             background: 'rgba(255, 255, 255, 0.02)',
             borderRadius: '14px'
           }}>
-            No operators found matching your criteria.
+            No attendees found matching your search.
           </div>
         ) : (
           filteredAttendees.map(att => {
@@ -171,9 +171,10 @@ export const PeopleScreen = () => {
                     color: isDiffRole ? '#00B0FF' : 'var(--green-primary)',
                     background: isDiffRole ? 'rgba(0, 176, 255, 0.12)' : 'rgba(0, 230, 118, 0.12)',
                     padding: '3px 8px',
-                    borderRadius: '6px'
+                    borderRadius: '6px',
+                    whiteSpace: 'nowrap'
                   }}>
-                    {isDiffRole ? '+15 PTS (Bonus)' : '+10 PTS'}
+                    {isDiffRole ? '+15 pts if you meet' : '+10 pts if you meet'}
                   </span>
                 </div>
 
@@ -199,14 +200,9 @@ export const PeopleScreen = () => {
                       <Check size={14} strokeWidth={3} /> Connected
                     </span>
                   ) : (
-                    <button
-                      className="pill-btn-action pill-btn-primary"
-                      style={{ width: 'auto', padding: '6px 14px', fontSize: '12px' }}
-                      onClick={() => connectToAttendee(att.id)}
-                    >
-                      <UserPlus size={13} />
-                      <span>Plug In</span>
-                    </button>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      Meet in person &amp; scan
+                    </span>
                   )}
                 </div>
               </div>

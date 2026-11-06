@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { QUIZ_QUESTIONS } from '../data/quizQuestions';
 import confetti from 'canvas-confetti';
 import { 
   X, 
@@ -14,25 +13,46 @@ export const PromptBlitzModal = () => {
   const { 
     blitzState, 
     submitPromptBlitz,
+    fetchQuizQuestions,
+    stageSettings,
     setActiveModal, 
     playTone,
     showToast 
   } = useApp();
 
+  const [questions, setQuestions] = useState([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(!blitzState.completed);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(20);
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
-  const [answers, setAnswers] = useState(() => Array(QUIZ_QUESTIONS.length).fill(-1));
+  const [answers, setAnswers] = useState({});
   const [quizFinished, setQuizFinished] = useState(blitzState.completed);
+  const [result, setResult] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const timerRef = useRef(null);
 
-  const currentQ = QUIZ_QUESTIONS[currentIndex];
+  const total = questions.length;
+  const currentQ = questions[currentIndex];
+  const resultScore = result ? result.score : blitzState.score;
+  const resultCorrect = result ? result.correct_count : blitzState.correctCount;
+  const resultTotal = result ? result.total_answered : Math.max(total, 10);
+  const passed = resultCorrect >= Math.ceil(resultTotal / 2);
+
+  useEffect(() => {
+    if (blitzState.completed) return;
+    let cancelled = false;
+    fetchQuizQuestions().then(list => {
+      if (cancelled) return;
+      setQuestions(list || []);
+      setLoadingQuestions(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Timer countdown
   useEffect(() => {
-    if (quizFinished || isAnswered) return;
+    if (quizFinished || isAnswered || !currentQ) return;
 
     timerRef.current = setInterval(() => {
       setSecondsLeft(prev => {
@@ -51,7 +71,6 @@ export const PromptBlitzModal = () => {
   const handleTimeOut = () => {
     setIsAnswered(true);
     setSelectedOption(-1); // Timed out
-    setAnswers(previous => previous.map((answer, index) => index === currentIndex ? -1 : answer));
     playTone('error');
   };
 
@@ -60,11 +79,11 @@ export const PromptBlitzModal = () => {
     clearInterval(timerRef.current);
     setSelectedOption(idx);
     setIsAnswered(true);
-    setAnswers(previous => previous.map((answer, index) => index === currentIndex ? idx : answer));
+    setAnswers(previous => ({ ...previous, [currentQ.id]: idx }));
   };
 
   const nextQuestion = () => {
-    if (currentIndex + 1 < QUIZ_QUESTIONS.length) {
+    if (currentIndex + 1 < total) {
       setCurrentIndex(prev => prev + 1);
       setSecondsLeft(20);
       setSelectedOption(null);
@@ -77,16 +96,19 @@ export const PromptBlitzModal = () => {
 
   const completeQuiz = async () => {
     setIsSubmitting(true);
-    const result = await submitPromptBlitz(answers);
+    const scored = await submitPromptBlitz(answers);
     setIsSubmitting(false);
-    if (!result) return;
+    if (!scored) return;
+    setResult(scored);
     setQuizFinished(true);
-    if (result.correct_count >= 5) {
+    if (scored.correct_count >= Math.ceil(total / 2)) {
       playTone('points');
       confetti({ particleCount: 100, spread: 75, origin: { y: 0.6 } });
     }
-    showToast('Quiz scored', `${result.correct_count}/10 correct. ${result.score} points recorded on the server.`, 'success');
+    showToast('Quiz scored', `${scored.correct_count}/${total} correct. ${scored.score} points recorded.`, 'success');
   };
+
+  const stageOpen = stageSettings[3];
 
   return (
     <div className="modal-overlay">
@@ -106,7 +128,7 @@ export const PromptBlitzModal = () => {
             <div>
               <h3 className="modal-title">Stage 3: Prompt Blitz</h3>
               <p style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                10 Questions · 20s Per Question · 10 points per correct answer
+                20s per question · 10 points per correct answer
               </p>
             </div>
           </div>
@@ -120,7 +142,19 @@ export const PromptBlitzModal = () => {
 
         {/* Body */}
         <div className="modal-body">
-          {!quizFinished ? (
+          {!quizFinished && (loadingQuestions || !stageOpen || !currentQ) ? (
+            <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
+              <Clock size={32} color="#FFD700" />
+              <h3 style={{ marginTop: '12px', color: '#FFF' }}>
+                {loadingQuestions ? 'Loading questions…' : !stageOpen ? 'Prompt Blitz is not open yet' : 'No questions yet'}
+              </h3>
+              {!loadingQuestions && (
+                <p style={{ fontSize: '13px', marginTop: '6px' }}>
+                  {!stageOpen ? 'Wait for the organizers to announce it.' : 'The organizers are still setting up. Check back soon.'}
+                </p>
+              )}
+            </div>
+          ) : !quizFinished ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Question Index & Live Score Bar */}
               <div style={{
@@ -130,12 +164,12 @@ export const PromptBlitzModal = () => {
                 fontSize: '13px'
               }}>
                 <span style={{ fontWeight: '800', color: 'var(--text-light)' }}>
-                  Question {currentIndex + 1} of 10
+                  Question {currentIndex + 1} of {total}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Award size={16} color="#FFD700" />
                   <span style={{ fontWeight: '800', color: '#FFD700' }}>
-                    {answers.filter(answer => answer >= 0).length}/10 answered
+                    {Object.keys(answers).length}/{total} answered
                   </span>
                 </div>
               </div>
@@ -175,15 +209,6 @@ export const PromptBlitzModal = () => {
                   fontWeight: '700'
                 }}>
                   {currentQ.topic}
-                </span>
-                <span style={{
-                  fontSize: '10.5px',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  color: 'var(--text-muted)',
-                  padding: '3px 8px',
-                  borderRadius: '6px'
-                }}>
-                  Sponsored by {currentQ.sponsor}
                 </span>
               </div>
 
@@ -254,7 +279,7 @@ export const PromptBlitzModal = () => {
                     onClick={nextQuestion}
                     disabled={isSubmitting}
                   >
-                    <span>{isSubmitting ? 'Submitting…' : currentIndex + 1 === 10 ? 'Submit for Scoring' : 'Next Question'}</span>
+                    <span>{isSubmitting ? 'Submitting…' : currentIndex + 1 === total ? 'Submit for Scoring' : 'Next Question'}</span>
                     <ArrowRight size={16} />
                   </button>
                 </div>
@@ -274,22 +299,22 @@ export const PromptBlitzModal = () => {
                 width: '72px',
                 height: '72px',
                 borderRadius: '50%',
-                background: blitzState.correctCount >= 5 ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 215, 0, 0.15)',
-                border: `2px solid ${blitzState.correctCount >= 5 ? '#00E676' : '#FFD700'}`,
+                background: passed ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 215, 0, 0.15)',
+                border: `2px solid ${passed ? '#00E676' : '#FFD700'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: '0 0 30px rgba(0, 230, 118, 0.25)'
               }}>
-                <Award size={36} color={blitzState.correctCount >= 5 ? '#00E676' : '#FFD700'} />
+                <Award size={36} color={passed ? '#00E676' : '#FFD700'} />
               </div>
 
               <div>
                 <h3 style={{ fontSize: '22px', fontWeight: '800' }}>
-                  {blitzState.correctCount >= 5 ? 'Prompt Blitz Conquered!' : 'Prompt Blitz Completed'}
+                  {passed ? 'Prompt Blitz Conquered!' : 'Prompt Blitz Completed'}
                 </h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>
-                  {blitzState.correctCount >= 5
+                  {passed
                     ? 'Stage 3 cleared! Fast fingers and sharp minds. You dey move!'
                     : 'Good effort! Blitz can only be officially scored once.'}
                 </p>
@@ -311,7 +336,7 @@ export const PromptBlitzModal = () => {
                     Points Earned
                   </span>
                   <div style={{ fontSize: '26px', fontWeight: '800', color: '#FFD700', fontFamily: 'var(--font-heading)' }}>
-                    +{blitzState.score}
+                    +{resultScore}
                   </div>
                 </div>
 
@@ -320,7 +345,7 @@ export const PromptBlitzModal = () => {
                     Correct Answers
                   </span>
                   <div style={{ fontSize: '26px', fontWeight: '800', color: 'var(--green-primary)', fontFamily: 'var(--font-heading)' }}>
-                    {blitzState.correctCount}/10
+                    {resultCorrect}/{resultTotal}
                   </div>
                 </div>
               </div>

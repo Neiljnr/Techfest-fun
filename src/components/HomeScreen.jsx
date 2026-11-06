@@ -27,8 +27,23 @@ export const HomeScreen = () => {
     setModalData,
     setCurrentTab,
     signalDrops,
-    leaderboard
+    leaderboard,
+    stageSettings,
+    showToast
   } = useApp();
+
+  const openStage = (stg) => {
+    if (!stageSettings[stg.number]) {
+      showToast('Not open yet', `Stage ${stg.number} opens when the organizers announce it.`, 'warning');
+      return;
+    }
+    if (stg.number === 3) {
+      setActiveModal('blitz');
+    } else {
+      setModalData(stg);
+      setActiveModal('stage_detail');
+    }
+  };
 
   const clearedCount = getClearedStagesCount();
 
@@ -125,15 +140,9 @@ export const HomeScreen = () => {
                 type="button"
                 key={stg.id} 
                 className={`stage-node-item ${isCleared ? 'cleared' : ''} ${isActive ? 'active' : ''}`}
+                style={stageSettings[stg.number] ? undefined : { opacity: 0.45 }}
                 aria-label={`Open stage ${stg.number}: ${stg.title}`}
-                onClick={() => {
-                  if (stg.number === 3) {
-                    setActiveModal('blitz');
-                  } else {
-                    setModalData(stg);
-                    setActiveModal('stage_detail');
-                  }
-                }}
+                onClick={() => openStage(stg)}
               >
                 <div 
                   className="stage-circle-btn"
@@ -162,16 +171,9 @@ export const HomeScreen = () => {
         {/* Pill Button below: "Start the quest" */}
         <button 
           className="pill-btn-action pill-btn-primary"
-          onClick={() => {
-            if (nextStage.number === 3) {
-              setActiveModal('blitz');
-            } else {
-              setModalData(nextStage);
-              setActiveModal('stage_detail');
-            }
-          }}
+          onClick={() => openStage(nextStage)}
         >
-          <span>{clearedCount === 4 ? 'All Stages Cleared! View Stats' : `Enter Stage ${nextStage.number}: ${nextStage.title}`}</span>
+          <span>{clearedCount === 4 ? 'All Stages Cleared! View Stats' : stageSettings[nextStage.number] ? `Enter Stage ${nextStage.number}: ${nextStage.title}` : `Stage ${nextStage.number} opens soon`}</span>
           <ArrowRight size={16} />
         </button>
       </div>
@@ -180,7 +182,7 @@ export const HomeScreen = () => {
       <div className="quest-card next-up-card">
         <div className="next-up-header">
           <span className="next-up-badge">
-            Stage {nextStage.number} Active
+            Stage {nextStage.number} {stageSettings[nextStage.number] ? 'Active' : 'Locked'}
           </span>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             Cap: {nextStage.cap} pts
@@ -219,14 +221,7 @@ export const HomeScreen = () => {
               alignItems: 'center',
               gap: '4px'
             }}
-            onClick={() => {
-              if (nextStage.number === 3) {
-                setActiveModal('blitz');
-              } else {
-                setModalData(nextStage);
-                setActiveModal('stage_detail');
-              }
-            }}
+            onClick={() => openStage(nextStage)}
           >
             Open Tasks <ChevronRight size={14} />
           </button>

@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { PARTNERS } from '../data/partners';
 import { SESSIONS } from '../data/sessions';
 import QRCode from 'qrcode';
+import { StageControl, QuizManager } from './AdminStageQuiz';
 import { 
   Shield, 
   Flame, 
@@ -124,12 +125,12 @@ export const AdminDashboard = () => {
       {/* Nav Tabs */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
+        gridTemplateColumns: 'repeat(3, 1fr)',
         background: 'rgba(255, 255, 255, 0.04)',
         padding: '4px',
         borderRadius: '10px'
       }}>
-        {['overview', 'drops', 'ledger', 'finale'].map(tab => (
+        {['overview', 'stages', 'quiz', 'drops', 'ledger', 'finale'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveAdminTab(tab)}
@@ -149,6 +150,9 @@ export const AdminDashboard = () => {
           </button>
         ))}
       </div>
+
+      {activeAdminTab === 'stages' && <StageControl />}
+      {activeAdminTab === 'quiz' && <QuizManager />}
 
       {/* OVERVIEW TAB */}
       {activeAdminTab === 'overview' && (

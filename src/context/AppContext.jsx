@@ -152,6 +152,9 @@ export const AppProvider = ({ children }) => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [signalDrops, setSignalDrops] = useState([]);
   const [staffEventCodes, setStaffEventCodes] = useState([]);
+  const [staffQuizQuestions, setStaffQuizQuestions] = useState([]);
+  const [stageSettings, setStageSettings] = useState({ 1: true, 2: true, 3: false, 4: false });
+  const loadedUserRef = useRef(null);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [offlineQueue, setOfflineQueue] = useState(readOfflineQueue);
   const [toastMessage, setToastMessage] = useState(null);
@@ -173,8 +176,12 @@ export const AppProvider = ({ children }) => {
 
   const refreshData = async (authUser = session?.user) => {
     if (!isSupabaseConfigured || !authUser) return;
-    setDataLoading(true);
-    setBackendError('');
+    // Background refreshes must not blank the screen or close open popups.
+    const firstLoad = loadedUserRef.current !== authUser.id;
+    if (firstLoad) {
+      setDataLoading(true);
+      setBackendError('');
+    }
     try {
       const pending = readPendingSignup();
       const { error: profileError } = await supabase.rpc('ensure_profile', {
@@ -184,7 +191,7 @@ export const AppProvider = ({ children }) => {
       if (profileError) throw profileError;
       localStorage.removeItem(PENDING_SIGNUP_KEY);
       const [profileResult, stateResult, ledgerResult, connectionsResult,
-        attendeesResult, boardResult, catalogResult, accessResult] = await Promise.all([
+        attendeesResult, boardResult, catalogResult, accessResult, stagesResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', authUser.id).single(),
         supabase.from('participant_state').select('*').eq('user_id', authUser.id).single(),
         supabase.from('point_ledger').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false }),
@@ -192,10 +199,11 @@ export const AppProvider = ({ children }) => {
         supabase.from('attendee_directory').select('*').order('name'),
         supabase.from('leaderboard').select('*').order('points', { ascending: false }),
         supabase.from('active_event_catalog').select('*').order('title'),
-        supabase.rpc('get_event_access')
+        supabase.rpc('get_event_access'),
+        supabase.from('stage_settings').select('*')
       ]);
       const results = [profileResult, stateResult, ledgerResult, connectionsResult,
-        attendeesResult, boardResult, catalogResult, accessResult];
+        attendeesResult, boardResult, catalogResult, accessResult, stagesResult];
       const failed = results.find(result => result.error);
       if (failed) throw failed.error;
 
@@ -251,25 +259,31 @@ export const AppProvider = ({ children }) => {
       setLeaderboard(boardRows);
       setSignalDrops(drops);
       setIsAdmin(staff);
+      setStageSettings(Object.fromEntries(stagesResult.data.map(row => [row.stage, row.active])));
+      loadedUserRef.current = authUser.id;
 
       if (staff) {
-        const [staffLedgerResult, eventCodesResult] = await Promise.all([
+        const [staffLedgerResult, eventCodesResult, staffQuizResult] = await Promise.all([
           supabase.from('staff_ledger').select('*').order('created_at', { ascending: false }).limit(200),
-          supabase.from('staff_event_codes').select('*').order('created_at', { ascending: false })
+          supabase.from('staff_event_codes').select('*').order('created_at', { ascending: false }),
+          supabase.from('staff_quiz_questions').select('*').order('sort_order', { ascending: true })
         ]);
         if (staffLedgerResult.error) throw staffLedgerResult.error;
         if (eventCodesResult.error) throw eventCodesResult.error;
+        if (staffQuizResult.error) throw staffQuizResult.error;
         setAdminLedger(staffLedgerResult.data.map(mapLedgerEntry));
         setStaffEventCodes(eventCodesResult.data);
+        setStaffQuizQuestions(staffQuizResult.data);
       } else {
         setAdminLedger([]);
         setStaffEventCodes([]);
+        setStaffQuizQuestions([]);
       }
     } catch (error) {
-      setBackendError(error.message || 'Could not load your account data.');
+      if (firstLoad) setBackendError(error.message || 'Could not load your account data.');
       throw error;
     } finally {
-      setDataLoading(false);
+      if (firstLoad) setDataLoading(false);
     }
   };
 
@@ -290,11 +304,15 @@ export const AppProvider = ({ children }) => {
 
   // Lightweight live poll: board, own notifications, and own score
   const pollLive = async (authUser) => {
-    const [boardResult, notifResult] = await Promise.all([
+    const [boardResult, notifResult, stagesResult] = await Promise.all([
       supabase.from('leaderboard').select('*').order('points', { ascending: false }),
-      supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(30)
+      supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(30),
+      supabase.from('stage_settings').select('*')
     ]);
     if (!boardResult.error) setLeaderboard(mapBoardRows(boardResult.data));
+    if (!stagesResult.error) {
+      setStageSettings(Object.fromEntries(stagesResult.data.map(row => [row.stage, row.active])));
+    }
     if (notifResult.error) return;
     const rows = notifResult.data;
     setNotifications(rows);
@@ -347,6 +365,7 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     if (!session?.user) {
+      loadedUserRef.current = null;
       setUser(null);
       setDataLoading(false);
       setIsAdmin(false);
@@ -515,18 +534,6 @@ export const AppProvider = ({ children }) => {
     return true;
   };
 
-  const connectToAttendee = async (attendeeId) => {
-    const { data, error } = await supabase.rpc('request_connection_by_id', { p_profile_id: attendeeId });
-    if (error) {
-      showError('Connection failed', error);
-      return false;
-    }
-    await refreshData();
-    playTone('points');
-    showToast(`Connected with ${data?.name || 'attendee'}`, data?.points ? `+${data.points} points` : 'You are now plugged in.', 'success');
-    return true;
-  };
-
   const completePartnerTask = async (partnerId, answer) => {
     const { data, error } = await supabase.rpc('complete_partner_task', {
       p_partner_id: partnerId,
@@ -553,8 +560,66 @@ export const AppProvider = ({ children }) => {
       showError('Quiz could not be submitted', error);
       return null;
     }
-    await refreshData();
+    refreshData().catch(() => {});
     return data;
+  };
+
+  const fetchQuizQuestions = async () => {
+    const { data, error } = await supabase.from('quiz_questions_public').select('*')
+      .order('sort_order', { ascending: true });
+    if (error) {
+      showError('Quiz questions could not be loaded', error);
+      return [];
+    }
+    return data;
+  };
+
+  const setStageActive = async (stage, active) => {
+    const { error } = await supabase.rpc('staff_set_stage_active', { p_stage: stage, p_active: active });
+    if (error) {
+      showError('Stage could not be updated', error);
+      return false;
+    }
+    setStageSettings(previous => ({ ...previous, [stage]: active }));
+    showToast(active ? `Stage ${stage} opened` : `Stage ${stage} closed`,
+      active ? 'All attendees were notified.' : 'Attendees can no longer score in this stage.', 'success');
+    return true;
+  };
+
+  const saveQuizQuestion = async (question) => {
+    const { error } = await supabase.rpc('staff_save_quiz_question', {
+      p_id: question.id || null,
+      p_sort_order: Number(question.sort_order ?? question.sortOrder) || 0,
+      p_topic: question.topic || '',
+      p_question: question.question,
+      p_options: question.options,
+      p_correct_index: Number(question.correct_index ?? question.correctIndex),
+      p_explanation: question.explanation || '',
+      p_active: question.active !== false
+    });
+    if (error) {
+      showError('Question could not be saved', error);
+      return false;
+    }
+    await refreshStaffQuiz();
+    showToast('Question saved', 'The quiz is updated for everyone.', 'success');
+    return true;
+  };
+
+  const deleteQuizQuestion = async (id) => {
+    const { error } = await supabase.rpc('staff_delete_quiz_question', { p_id: id });
+    if (error) {
+      showError('Question could not be deleted', error);
+      return false;
+    }
+    await refreshStaffQuiz();
+    return true;
+  };
+
+  const refreshStaffQuiz = async () => {
+    const { data, error } = await supabase.from('staff_quiz_questions').select('*')
+      .order('sort_order', { ascending: true });
+    if (!error) setStaffQuizQuestions(data);
   };
 
   const handleQrScan = async (rawCode, isSyncingOffline = false) => {
@@ -743,9 +808,14 @@ export const AppProvider = ({ children }) => {
     connections,
     notifications,
     markNotificationsRead,
-    connectToAttendee,
     blitzState,
     submitPromptBlitz,
+    fetchQuizQuestions,
+    stageSettings,
+    staffQuizQuestions,
+    setStageActive,
+    saveQuizQuestion,
+    deleteQuizQuestion,
     partnerVisits,
     completePartnerTask,
     capturedSessions,
