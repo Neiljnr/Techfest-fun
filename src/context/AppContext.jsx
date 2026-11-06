@@ -7,6 +7,7 @@ import { getAvatarMeta, getRoleMeta } from '../data/avatars';
 import { isNeonConfigured as isSupabaseConfigured, neon as supabase } from '../lib/neon';
 
 const PENDING_SIGNUP_KEY = 'techfest-pending-signup';
+const SNAPSHOT_KEY = 'techfest-snapshot';
 
 const readPendingSignup = () => {
   try {
@@ -174,24 +175,47 @@ export const AppProvider = ({ children }) => {
     showToast(title, error?.message || 'The request could not be completed. Please try again.', 'error');
   };
 
+  const applySnapshot = (snapshot) => {
+    setUser(snapshot.user);
+    setLedger(snapshot.ledger);
+    setPoints(snapshot.points);
+    setStage1Quests(snapshot.quests);
+    setConnections(snapshot.connections);
+    setBlitzState(snapshot.blitz);
+    setPartnerVisits(snapshot.partnerVisits);
+    setCapturedSessions(snapshot.capturedSessions);
+    setClaimedDrops(snapshot.claimedDrops);
+    setAttendees(snapshot.attendees);
+    setLeaderboard(snapshot.leaderboard);
+    setSignalDrops(snapshot.drops);
+    setIsAdmin(snapshot.isAdmin);
+    setStageSettings(snapshot.stages);
+  };
+
   const refreshData = async (authUser = session?.user) => {
     if (!isSupabaseConfigured || !authUser) return;
     // Background refreshes must not blank the screen or close open popups.
-    const firstLoad = loadedUserRef.current !== authUser.id;
+    let firstLoad = loadedUserRef.current !== authUser.id;
+    if (firstLoad) {
+      // Paint the last known state instantly; fresh data replaces it a moment later.
+      try {
+        const cached = JSON.parse(localStorage.getItem(`${SNAPSHOT_KEY}:${authUser.id}`) || 'null');
+        if (cached?.user) {
+          applySnapshot(cached);
+          loadedUserRef.current = authUser.id;
+          firstLoad = false;
+        }
+      } catch { /* ignore a corrupt cache */ }
+    }
     if (firstLoad) {
       setDataLoading(true);
       setBackendError('');
     }
     try {
       const pending = readPendingSignup();
-      const { error: profileError } = await supabase.rpc('ensure_profile', {
-        p_name: pending?.email === authUser.email?.toLowerCase() ? pending.name : null,
-        p_role: pending?.email === authUser.email?.toLowerCase() ? pending.role : null
-      });
-      if (profileError) throw profileError;
-      localStorage.removeItem(PENDING_SIGNUP_KEY);
-      const [profileResult, stateResult, ledgerResult, connectionsResult,
-        attendeesResult, boardResult, catalogResult, accessResult, stagesResult] = await Promise.all([
+      const hasPending = pending?.email === authUser.email?.toLowerCase();
+      // One parallel round trip. Staff-only views simply return nothing for normal attendees.
+      const fetchAll = () => Promise.all([
         supabase.from('profiles').select('*').eq('id', authUser.id).single(),
         supabase.from('participant_state').select('*').eq('user_id', authUser.id).single(),
         supabase.from('point_ledger').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false }),
@@ -200,11 +224,26 @@ export const AppProvider = ({ children }) => {
         supabase.from('leaderboard').select('*').order('points', { ascending: false }),
         supabase.from('active_event_catalog').select('*').order('title'),
         supabase.rpc('get_event_access'),
-        supabase.from('stage_settings').select('*')
+        supabase.from('stage_settings').select('*'),
+        supabase.from('staff_ledger').select('*').order('created_at', { ascending: false }).limit(200),
+        supabase.from('staff_event_codes').select('*').order('created_at', { ascending: false }),
+        supabase.from('staff_quiz_questions').select('*').order('sort_order', { ascending: true })
       ]);
-      const results = [profileResult, stateResult, ledgerResult, connectionsResult,
-        attendeesResult, boardResult, catalogResult, accessResult, stagesResult];
-      const failed = results.find(result => result.error);
+      let results = await fetchAll();
+      // Only new accounts (or a pending signup) need the profile created first.
+      if (hasPending || results[0].error || results[1].error) {
+        const { error: profileError } = await supabase.rpc('ensure_profile', {
+          p_name: hasPending ? pending.name : null,
+          p_role: hasPending ? pending.role : null
+        });
+        if (profileError) throw profileError;
+        localStorage.removeItem(PENDING_SIGNUP_KEY);
+        results = await fetchAll();
+      }
+      const [profileResult, stateResult, ledgerResult, connectionsResult,
+        attendeesResult, boardResult, catalogResult, accessResult, stagesResult,
+        staffLedgerResult, eventCodesResult, staffQuizResult] = results;
+      const failed = results.slice(0, 9).find(result => result.error);
       if (failed) throw failed.error;
 
       const currentUser = mapProfile(profileResult.data, authUser);
@@ -246,28 +285,29 @@ export const AppProvider = ({ children }) => {
         .filter(item => item.kind === 'signal')
         .map(item => ({ ...item, active: true }));
 
-      setUser(currentUser);
-      setLedger(ownLedger);
-      setPoints(totalPoints);
-      setStage1Quests(questRows);
-      setConnections(confirmed);
-      setBlitzState(state.blitz_state || EMPTY_BLITZ);
-      setPartnerVisits(state.partner_visits || {});
-      setCapturedSessions(state.captured_sessions || []);
-      setClaimedDrops(state.claimed_drops || []);
-      setAttendees(directoryRows);
-      setLeaderboard(boardRows);
-      setSignalDrops(drops);
-      setIsAdmin(staff);
-      setStageSettings(Object.fromEntries(stagesResult.data.map(row => [row.stage, row.active])));
+      const snapshot = {
+        user: currentUser,
+        ledger: ownLedger,
+        points: totalPoints,
+        quests: questRows,
+        connections: confirmed,
+        blitz: state.blitz_state || EMPTY_BLITZ,
+        partnerVisits: state.partner_visits || {},
+        capturedSessions: state.captured_sessions || [],
+        claimedDrops: state.claimed_drops || [],
+        attendees: directoryRows,
+        leaderboard: boardRows,
+        drops,
+        isAdmin: staff,
+        stages: Object.fromEntries(stagesResult.data.map(row => [row.stage, row.active]))
+      };
+      applySnapshot(snapshot);
+      try {
+        localStorage.setItem(`${SNAPSHOT_KEY}:${authUser.id}`, JSON.stringify(snapshot));
+      } catch { /* storage full or unavailable: cache is optional */ }
       loadedUserRef.current = authUser.id;
 
       if (staff) {
-        const [staffLedgerResult, eventCodesResult, staffQuizResult] = await Promise.all([
-          supabase.from('staff_ledger').select('*').order('created_at', { ascending: false }).limit(200),
-          supabase.from('staff_event_codes').select('*').order('created_at', { ascending: false }),
-          supabase.from('staff_quiz_questions').select('*').order('sort_order', { ascending: true })
-        ]);
         if (staffLedgerResult.error) throw staffLedgerResult.error;
         if (eventCodesResult.error) throw eventCodesResult.error;
         if (staffQuizResult.error) throw staffQuizResult.error;
@@ -366,9 +406,14 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     if (!session?.user) {
       loadedUserRef.current = null;
+      if (!authLoading) {
+        Object.keys(localStorage)
+          .filter(key => key.startsWith(`${SNAPSHOT_KEY}:`))
+          .forEach(key => localStorage.removeItem(key));
+      }
       setUser(null);
-      setDataLoading(false);
       setIsAdmin(false);
+      setDataLoading(false);
       return;
     }
     refreshData(session.user).catch(error => showError('Account data unavailable', error));
@@ -855,6 +900,7 @@ export const AppProvider = ({ children }) => {
     reverseLedgerEntry,
     playTone,
     authLoading,
+    session,
     dataLoading,
     backendError,
     isSupabaseConfigured,

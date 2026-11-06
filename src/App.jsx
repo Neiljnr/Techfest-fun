@@ -26,7 +26,7 @@ import {
 
 export const App = () => {
   const {
-    currentTab, activeModal, toastMessage, user, isAdmin, authLoading,
+    currentTab, activeModal, toastMessage, user, session, isAdmin, authLoading,
     dataLoading, backendError, isSupabaseConfigured, refreshData
   } = useApp();
 
@@ -47,7 +47,7 @@ export const App = () => {
     return <div className="app-container"><div className="app-wrapper"><main className="main-content">Restoring your secure session…</main></div></div>;
   }
 
-  if (!user) {
+  if (!user && !session) {
     return (
       <div className="app-container">
         <div className="app-wrapper" style={{ maxWidth: '480px' }}>
@@ -58,7 +58,7 @@ export const App = () => {
     );
   }
 
-  if (dataLoading) {
+  if ((dataLoading || !user) && !backendError) {
     return <div className="app-container"><div className="app-wrapper"><main className="main-content">Loading your event account…</main></div></div>;
   }
 
