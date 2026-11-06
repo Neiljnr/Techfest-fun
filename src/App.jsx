@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useApp } from './context/AppContext';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -6,7 +6,6 @@ import { HomeScreen } from './components/HomeScreen';
 import { PeopleScreen } from './components/PeopleScreen';
 import { PlugScreen } from './components/PlugScreen';
 import { LeaderboardScreen } from './components/LeaderboardScreen';
-import { VenueProjectorView } from './components/VenueProjectorView';
 
 // Modals
 import { ScannerModal } from './components/ScannerModal';
@@ -16,11 +15,10 @@ import { PartnerDetailModal } from './components/PartnerDetailModal';
 import { OperatorCardModal } from './components/OperatorCardModal';
 import { ProfileModal } from './components/ProfileModal';
 import { SignupModal } from './components/SignupModal';
+import { NotificationsModal } from './components/NotificationsModal';
 import { AdminDashboard } from './components/AdminDashboard';
 
 import { 
-  Smartphone, 
-  Maximize2, 
   CheckCircle, 
   AlertTriangle, 
   Info
@@ -31,9 +29,6 @@ export const App = () => {
     currentTab, activeModal, toastMessage, user, isAdmin, authLoading,
     dataLoading, backendError, isSupabaseConfigured, refreshData
   } = useApp();
-  const [wideMode, setWideMode] = useState(false);
-
-  const isVenueMode = currentTab === 'venue';
 
   if (!isSupabaseConfigured) {
     return (
@@ -85,34 +80,8 @@ export const App = () => {
     <div className="app-container">
       {/* Outer Shell */}
       <div 
-        className={`app-wrapper ${isVenueMode ? 'venue-fullscreen' : wideMode ? 'wide-mode' : ''}`}
-        style={wideMode && !isVenueMode ? { maxWidth: '720px' } : undefined}
+        className="app-wrapper"
       >
-        {/* Floating Desktop Viewport Switcher */}
-        {!isVenueMode && (
-          <div className="desktop-toggle-hint">
-            <button
-              onClick={() => setWideMode(!wideMode)}
-              style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid var(--border-subtle)',
-                color: 'var(--text-light)',
-                padding: '6px 10px',
-                borderRadius: '8px',
-                fontSize: '11px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-              title="Toggle mobile preview / wider container"
-            >
-              {wideMode ? <Smartphone size={12} /> : <Maximize2 size={12} />}
-              <span>{wideMode ? 'Mobile' : 'Wide'}</span>
-            </button>
-          </div>
-        )}
-
         {/* Global Toast */}
         {toastMessage && (
           <div className="toast-container">
@@ -129,8 +98,7 @@ export const App = () => {
           </div>
         )}
 
-        {/* Header (Hidden in venue projector mode) */}
-        {!isVenueMode && <Header />}
+        <Header />
 
         {/* Main Tab Screen */}
         {currentTab === 'admin' && isAdmin ? <AdminDashboard /> : null}
@@ -138,12 +106,11 @@ export const App = () => {
         {currentTab === 'people' && <PeopleScreen />}
         {currentTab === 'plug' && <PlugScreen />}
         {currentTab === 'board' && <LeaderboardScreen />}
-        {currentTab === 'venue' && <VenueProjectorView />}
 
-        {/* Bottom Dock Navigation (Hidden in venue projector mode) */}
-        {!isVenueMode && <BottomNav />}
+        <BottomNav />
 
         {/* Active Modals */}
+        {activeModal === 'notifications' && <NotificationsModal />}
         {activeModal === 'scanner' && <ScannerModal />}
         {activeModal === 'stage_detail' && <StageDetailModal />}
         {activeModal === 'blitz' && <PromptBlitzModal />}

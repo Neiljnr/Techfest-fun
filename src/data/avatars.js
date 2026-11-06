@@ -27,14 +27,6 @@ export const ROLES = [
     icon: 'Palette'
   },
   {
-    id: 'operator',
-    name: 'Operator',
-    tagline: 'Automate workflows, drive growth & systems',
-    badge: '⚙️ Systems & Growth',
-    color: '#FFD700',
-    icon: 'Cpu'
-  },
-  {
     id: 'student',
     name: 'Student',
     tagline: 'Future engineer, hungry learner, next-gen builder',
@@ -158,7 +150,7 @@ export const AVATARS = [
   {
     id: 'av-7',
     name: 'Bulus',
-    role: 'operator',
+    role: 'builder',
     gender: 'm',
     bg: '#332905',
     border: '#FFD700',
@@ -176,7 +168,7 @@ export const AVATARS = [
   {
     id: 'av-8',
     name: 'Chidimma',
-    role: 'operator',
+    role: 'builder',
     gender: 'f',
     bg: '#302604',
     border: '#FFD700',

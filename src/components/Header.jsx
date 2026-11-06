@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Star, Wifi, WifiOff, QrCode, Shield } from 'lucide-react';
+import { Star, Wifi, WifiOff, QrCode, Shield, Bell } from 'lucide-react';
 
 export const Header = () => {
   const {
@@ -13,8 +13,10 @@ export const Header = () => {
     offlineQueue,
     syncOfflineQueue,
     setActiveModal,
-    setCurrentTab
+    setCurrentTab,
+    notifications
   } = useApp();
+  const unreadCount = notifications.filter(item => !item.read_at).length;
 
   return (
     <header className="app-header">
@@ -59,6 +61,25 @@ export const Header = () => {
               <WifiOff size={12} />
               <span>{offlineQueue.length > 0 ? `${offlineQueue.length} Queued` : 'Offline'}</span>
             </>
+          )}
+        </button>
+
+        {/* Notifications */}
+        <button
+          type="button"
+          className="header-icon-btn"
+          onClick={() => setActiveModal('notifications')}
+          title="Notifications"
+          aria-label={`Notifications, ${unreadCount} unread`}
+          style={{ position: 'relative' }}
+        >
+          <Bell size={17} />
+          {unreadCount > 0 && (
+            <span style={{
+              position: 'absolute', top: '-3px', right: '-3px', minWidth: '16px', height: '16px',
+              borderRadius: '8px', background: '#FF4081', color: '#fff', fontSize: '10px',
+              fontWeight: 800, display: 'grid', placeItems: 'center', padding: '0 3px'
+            }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
           )}
         </button>
 

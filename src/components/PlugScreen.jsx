@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   QrCode, 
@@ -17,8 +17,6 @@ export const PlugScreen = () => {
   const { 
     user, 
     connections, 
-    pendingHandshakes, 
-    confirmHandshake, 
     setActiveModal
   } = useApp();
 
@@ -58,71 +56,9 @@ export const PlugScreen = () => {
       <div>
         <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Plug: Networking & QR</h2>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          "Humans in the loop." Show your QR to connect or confirm incoming handshakes.
+          Show your QR or scan someone else's. You connect instantly and both earn points.
         </p>
       </div>
-
-      {/* 1. Pending Two-Sided Handshake Prompts (PRD P2) */}
-      {pendingHandshakes.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: '#00E676',
-              boxShadow: '0 0 8px #00E676'
-            }} />
-            <h4 style={{ fontSize: '13px', fontWeight: '800', color: 'var(--green-primary)', textTransform: 'uppercase' }}>
-              Incoming Connection Requests (Confirm within 2 mins)
-            </h4>
-          </div>
-
-          {pendingHandshakes.map(hs => (
-            <div
-              key={hs.id}
-              className="quest-card"
-              style={{
-                border: '1.5px solid var(--green-primary)',
-                background: 'rgba(0, 230, 118, 0.08)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: '800' }}>{hs.name} wants to connect</h4>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    Role: {hs.role.toUpperCase()} {hs.role !== user.role && '· 🌟 Cross-role bonus eligible!'}
-                  </span>
-                </div>
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: '800',
-                  color: 'var(--green-primary)',
-                  background: 'rgba(0, 230, 118, 0.2)',
-                  padding: '3px 8px',
-                  borderRadius: '6px'
-                }}>
-                  Awaiting acceptance
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  className="pill-btn-action pill-btn-primary"
-                  style={{ flex: 1, padding: '8px' }}
-                  onClick={() => confirmHandshake(hs.id)}
-                >
-                  <Check size={16} strokeWidth={3} />
-                  <span>Confirm connection</span>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Attendee badge */}
       <div 
@@ -138,7 +74,7 @@ export const PlugScreen = () => {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <ShieldCheck size={18} color="var(--green-primary)" />
-          <h3 style={{ fontSize: '16px', fontWeight: '800' }}>My Operator Badge QR</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: '800' }}>My Badge QR</h3>
         </div>
 
         <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', maxWidth: '320px' }}>
@@ -164,7 +100,7 @@ export const PlugScreen = () => {
           <p role="alert" style={{ color: '#FF8A80', fontSize: '12px' }}>{qrError}</p>
         ) : (
           <div role="status" style={{ width: '240px', height: '240px', background: '#FFF', borderRadius: '12px', display: 'grid', placeItems: 'center', color: '#111', fontSize: '12px' }}>
-            Preparing your QR…
+            Preparing your QRâ€¦
           </div>
         )}
 
@@ -255,8 +191,8 @@ export const PlugScreen = () => {
                   {conn.name}
                 </span>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  {conn.role.toUpperCase()} · Confirmed at {conn.confirmedAt}
-                  {conn.role !== user.role && ' · Cross-role'}
+                  {conn.role.toUpperCase()} Â· Confirmed at {conn.confirmedAt}
+                  {conn.role !== user.role && ' Â· Cross-role'}
                 </div>
               </div>
 

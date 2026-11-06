@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@neon/neon-js": "^0.10.2",
+    "@neondatabase/serverless": "^1.2.0",
     "canvas-confetti": "^1.9.4",
     "jsqr": "^1.4.0",
     "lucide-react": "^1.16.0",

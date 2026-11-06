@@ -216,7 +216,7 @@ export const AdminDashboard = () => {
               <button
                 className="pill-btn-action pill-btn-secondary"
                 style={{ fontSize: '12px', padding: '8px' }}
-                onClick={() => setCurrentTab('venue')}
+                onClick={() => window.open('/screen', '_blank', 'noopener')}
               >
                 <QrCode size={14} />
                 <span>Projector View</span>

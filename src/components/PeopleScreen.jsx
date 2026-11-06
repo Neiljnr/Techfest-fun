@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const PeopleScreen = () => {
-  const { user, attendees, connections, outgoingRequestIds, connectToAttendee } = useApp();
+  const { user, attendees, connections, connectToAttendee } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
 
@@ -130,7 +130,6 @@ export const PeopleScreen = () => {
         ) : (
           filteredAttendees.map(att => {
             const isConnected = connectedIds.includes(att.id);
-            const isPending = outgoingRequestIds.includes(att.id);
             const isDiffRole = att.role !== user.role;
             const avatar = getAvatarMeta(att.avatarId);
 
@@ -199,8 +198,6 @@ export const PeopleScreen = () => {
                     }}>
                       <Check size={14} strokeWidth={3} /> Connected
                     </span>
-                  ) : isPending ? (
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Request sent</span>
                   ) : (
                     <button
                       className="pill-btn-action pill-btn-primary"

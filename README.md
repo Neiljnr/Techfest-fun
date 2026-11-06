@@ -9,6 +9,7 @@ TechFest Quest is a React/Vite event application backed by Neon Auth and Neon Po
 3. Copy `.env.example` to `.env.local` and set:
    - `VITE_NEON_AUTH_URL`: the Neon Auth URL.
    - `VITE_NEON_DATA_API_URL`: the Neon Data API URL.
+   - `SCREEN_DATABASE_URL` (server-only, Vercel): connection string of the read-only `screen_reader` role. It powers `/api/leaderboard` and the public big-screen page at `/screen`. Apply `neon/migrations/202611060001_instant_connections.sql` after the base migration.
 4. Add the production URL as a trusted origin in Neon Auth (localhost is allowed for development).
 5. Run `npm install`, then `npm run dev`.
 

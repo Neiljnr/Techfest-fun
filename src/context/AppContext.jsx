@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { INITIAL_STAGE1_QUESTS } from '../data/quests';
 import { PARTNERS } from '../data/partners';
@@ -142,8 +142,8 @@ export const AppProvider = ({ children }) => {
   const [adminLedger, setAdminLedger] = useState([]);
   const [stage1Quests, setStage1Quests] = useState(INITIAL_STAGE1_QUESTS);
   const [connections, setConnections] = useState([]);
-  const [pendingHandshakes, setPendingHandshakes] = useState([]);
-  const [outgoingRequestIds, setOutgoingRequestIds] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const seenNotificationIds = useRef(null);
   const [blitzState, setBlitzState] = useState(EMPTY_BLITZ);
   const [partnerVisits, setPartnerVisits] = useState({});
   const [capturedSessions, setCapturedSessions] = useState([]);
@@ -209,18 +209,6 @@ export const AppProvider = ({ children }) => {
       const confirmed = connectionRows
         .filter(row => row.status === 'confirmed')
         .map(row => mapConnection(row, authUser.id, currentUser.role, ownLedger));
-      const incoming = connectionRows
-        .filter(row => row.status === 'pending' && row.recipient_id === authUser.id)
-        .map(row => ({
-          id: row.id,
-          senderId: row.requester_id,
-          name: row.requester_name,
-          role: row.requester_role,
-          avatarId: row.requester_avatar_id
-        }));
-      const outgoingIds = connectionRows
-        .filter(row => row.status === 'pending' && row.requester_id === authUser.id)
-        .map(row => row.recipient_id);
       const questRows = INITIAL_STAGE1_QUESTS.map(quest => ({
         ...quest,
         completed: ownLedger.some(entry =>
@@ -255,8 +243,6 @@ export const AppProvider = ({ children }) => {
       setPoints(totalPoints);
       setStage1Quests(questRows);
       setConnections(confirmed);
-      setPendingHandshakes(incoming);
-      setOutgoingRequestIds(outgoingIds);
       setBlitzState(state.blitz_state || EMPTY_BLITZ);
       setPartnerVisits(state.partner_visits || {});
       setCapturedSessions(state.captured_sessions || []);
@@ -287,20 +273,47 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const mapBoardRows = rows => rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    role: row.role,
+    avatarId: row.avatar_id,
+    hubId: row.hub_id,
+    points: row.points
+  }));
+
   const refreshLeaderboard = async () => {
     const { data, error } = await supabase.from('leaderboard').select('*').order('points', { ascending: false });
-    if (error) {
-      showError('Leaderboard could not refresh', error);
+    if (error) return;
+    setLeaderboard(mapBoardRows(data));
+  };
+
+  // Lightweight live poll: board, own notifications, and own score
+  const pollLive = async (authUser) => {
+    const [boardResult, notifResult] = await Promise.all([
+      supabase.from('leaderboard').select('*').order('points', { ascending: false }),
+      supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(30)
+    ]);
+    if (!boardResult.error) setLeaderboard(mapBoardRows(boardResult.data));
+    if (notifResult.error) return;
+    const rows = notifResult.data;
+    setNotifications(rows);
+    if (seenNotificationIds.current === null) {
+      seenNotificationIds.current = new Set(rows.map(row => row.id));
       return;
     }
-    setLeaderboard(data.map(row => ({
-      id: row.id,
-      name: row.name,
-      role: row.role,
-      avatarId: row.avatar_id,
-      hubId: row.hub_id,
-      points: row.points
-    })));
+    const fresh = rows.filter(row => !seenNotificationIds.current.has(row.id));
+    if (fresh.length) {
+      fresh.forEach(row => seenNotificationIds.current.add(row.id));
+      playTone('points');
+      showToast(fresh[0].title, fresh[0].body || '', 'success');
+      refreshData(authUser).catch(() => {});
+    }
+  };
+
+  const markNotificationsRead = async () => {
+    setNotifications(rows => rows.map(row => ({ ...row, read_at: row.read_at || new Date().toISOString() })));
+    await supabase.rpc('mark_notifications_read');
   };
 
   useEffect(() => {
@@ -343,11 +356,23 @@ export const AppProvider = ({ children }) => {
   }, [session?.user?.id]);
 
   useEffect(() => {
-    if (!session?.user) return undefined;
-    const interval = window.setInterval(() => {
-      refreshLeaderboard();
-    }, 30000);
-    return () => window.clearInterval(interval);
+    if (!session?.user) {
+      seenNotificationIds.current = null;
+      setNotifications([]);
+      return undefined;
+    }
+    const authUser = session.user;
+    const tick = () => {
+      if (document.visibilityState === 'visible') pollLive(authUser);
+    };
+    const interval = window.setInterval(tick, 4000);
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('focus', tick);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', tick);
+      window.removeEventListener('focus', tick);
+    };
   }, [session?.user?.id]);
 
   useEffect(() => {
@@ -490,25 +515,15 @@ export const AppProvider = ({ children }) => {
     return true;
   };
 
-  const confirmHandshake = async (handshakeId) => {
-    const { error } = await supabase.rpc('confirm_connection', { p_connection_id: handshakeId });
+  const connectToAttendee = async (attendeeId) => {
+    const { data, error } = await supabase.rpc('request_connection_by_id', { p_profile_id: attendeeId });
     if (error) {
-      showError('Connection could not be confirmed', error);
+      showError('Connection failed', error);
       return false;
     }
     await refreshData();
     playTone('points');
-    return true;
-  };
-
-  const connectToAttendee = async (attendeeId) => {
-    const { error } = await supabase.rpc('request_connection_by_id', { p_profile_id: attendeeId });
-    if (error) {
-      showError('Connection request failed', error);
-      return false;
-    }
-    await refreshData();
-    showToast('Request sent', 'The attendee must accept before points are awarded.', 'success');
+    showToast(`Connected with ${data?.name || 'attendee'}`, data?.points ? `+${data.points} points` : 'You are now plugged in.', 'success');
     return true;
   };
 
@@ -569,7 +584,8 @@ export const AppProvider = ({ children }) => {
         });
         if (error) throw error;
         await refreshData();
-        showToast('Connection request sent', `Waiting for ${data.name} to accept.`, 'success');
+        playTone('points');
+        showToast(`Connected with ${data.name}`, `+${data.points} points`, 'success');
         return { success: true, type: 'attendee', name: data.name };
       }
 
@@ -725,9 +741,8 @@ export const AppProvider = ({ children }) => {
     stage1Quests,
     completeStage1Quest,
     connections,
-    pendingHandshakes,
-    outgoingRequestIds,
-    confirmHandshake,
+    notifications,
+    markNotificationsRead,
     connectToAttendee,
     blitzState,
     submitPromptBlitz,

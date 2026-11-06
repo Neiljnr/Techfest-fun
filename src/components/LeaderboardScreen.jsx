@@ -69,7 +69,7 @@ export const LeaderboardScreen = () => {
 
         {/* Venue Screen Mode Trigger (L4) */}
         <button
-          onClick={() => setCurrentTab('venue')}
+          onClick={() => window.open('/screen', '_blank', 'noopener')}
           style={{
             display: 'flex',
             alignItems: 'center',

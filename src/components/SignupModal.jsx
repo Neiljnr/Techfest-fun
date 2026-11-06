@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { MailCheck, UserPlus } from 'lucide-react';
+﻿import React, { useState } from 'react';
+import { MailCheck, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ROLES } from '../data/avatars';
 
@@ -10,6 +10,7 @@ export const SignupModal = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('builder');
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,12 +71,27 @@ export const SignupModal = () => {
                   <input autoComplete="name" required maxLength={60} value={name}
                     onChange={event => setName(event.target.value)} placeholder="Your full name" style={inputStyle} />
                 </label>
-                <label style={labelStyle}>
-                  Your role
-                  <select value={role} onChange={event => setRole(event.target.value)} style={inputStyle}>
-                    {ROLES.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
-                  </select>
-                </label>
+                <div style={labelStyle}>
+                  I am aâ€¦
+                  <div role="radiogroup" aria-label="Your role" className="role-picker">
+                    {ROLES.map(option => {
+                      const selected = role === option.id;
+                      return (
+                        <button key={option.id} type="button" role="radio" aria-checked={selected}
+                          onClick={() => setRole(option.id)} className="role-option"
+                          style={{
+                            '--role-color': option.color,
+                            borderColor: selected ? option.color : 'var(--border-subtle)',
+                            background: selected ? `${option.color}24` : 'rgba(255,255,255,0.04)',
+                            color: selected ? option.color : '#E6EDE9'
+                          }}>
+                          <span className="role-option-name">{option.name}</span>
+                          <span className="role-option-tag">{option.badge}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </>
             )}
             <label style={labelStyle}>
@@ -85,12 +101,20 @@ export const SignupModal = () => {
             </label>
             <label style={labelStyle}>
               Password
-              <input type="password" required minLength={8} maxLength={128} value={password}
-                autoComplete={createAccount ? 'new-password' : 'current-password'}
-                onChange={event => setPassword(event.target.value)} placeholder="At least 8 characters" style={inputStyle} />
+              <div style={{ position: 'relative' }}>
+                <input type={showPassword ? 'text' : 'password'} required minLength={8} maxLength={128} value={password}
+                  autoComplete={createAccount ? 'new-password' : 'current-password'}
+                  onChange={event => setPassword(event.target.value)} placeholder="At least 8 characters"
+                  style={{ ...inputStyle, paddingRight: '48px' }} />
+                <button type="button" onClick={() => setShowPassword(value => !value)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword}
+                  className="password-toggle">
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </label>
             <button type="submit" className="pill-btn-action pill-btn-primary" disabled={isSubmitting}>
-              <span>{isSubmitting ? 'Please wait…' : createAccount ? 'Create account' : 'Sign in'}</span>
+              <span>{isSubmitting ? 'Please waitâ€¦' : createAccount ? 'Create account' : 'Sign in'}</span>
             </button>
             <button type="button" className="pill-btn-action pill-btn-secondary"
               onClick={() => setCreateAccount(value => !value)}>
@@ -116,7 +140,7 @@ export const SignupModal = () => {
                 placeholder="000000" style={inputStyle} />
             </label>
             <button type="submit" className="pill-btn-action pill-btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Verifying…' : 'Verify and continue'}
+              {isSubmitting ? 'Verifyingâ€¦' : 'Verify and continue'}
             </button>
             <button type="button" className="pill-btn-action pill-btn-secondary" onClick={() => setStep('email')}>
               Change email or resend code

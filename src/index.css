@@ -1,5 +1,5 @@
-/* ==========================================================================
-   Jos TechFest 2026 · AI x Industry · Sarau Event Center, Jos
+﻿/* ==========================================================================
+   Jos TechFest 2026 Â· AI x Industry Â· Sarau Event Center, Jos
    TechFest Quest Design System (Vanilla CSS)
    ========================================================================== */
 
@@ -904,6 +904,103 @@ h1, h2, h3, h4, h5 {
   margin-top: -2px;
 }
 
+/* Signup role picker + password toggle */
+.role-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.role-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 56px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-subtle);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.role-option:active {
+  transform: scale(0.97);
+}
+
+.role-option-name {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.role-option-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-35%);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* Phone-first sizing */
+html, body {
+  min-height: 100dvh;
+}
+
+.app-container,
+.app-wrapper {
+  min-height: 100dvh;
+}
+
+input, select, textarea {
+  font-size: 16px;
+}
+
+.modal-sheet {
+  max-height: 92dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.modal-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+@media (max-width: 380px) {
+  html, body {
+    font-size: 14px;
+  }
+  .role-picker {
+    grid-template-columns: 1fr;
+  }
+  .modal-header {
+    padding: 12px 14px;
+  }
+  .modal-title {
+    font-size: 16px;
+  }
+}
+
 /* Modals */
 .modal-overlay {
   position: fixed;
@@ -1079,3 +1176,23 @@ h1, h2, h3, h4, h5 {
   50% { top: 88%; opacity: 1; }
   100% { top: 10%; opacity: 0.7; }
 }
+
+/* Public big-screen leaderboard */
+.screen-page { min-height: 100dvh; padding: 3vmin 4vmin; background: #060807; color: #fff; display: flex; flex-direction: column; gap: 2vmin; }
+.screen-head { display: flex; justify-content: space-between; align-items: center; gap: 3vmin; }
+.screen-head h1 { font-size: clamp(28px, 5vmin, 72px); font-weight: 900; color: var(--green-primary); line-height: 1.1; }
+.screen-head p { font-size: clamp(14px, 2.2vmin, 28px); color: var(--text-muted); }
+.screen-join { display: flex; align-items: center; gap: 2vmin; text-align: right; font-size: clamp(12px, 1.8vmin, 24px); color: var(--text-muted); }
+.screen-join img { width: clamp(80px, 16vmin, 220px); border-radius: 12px; background: #fff; }
+.screen-warn { color: #FFD700; font-size: clamp(14px, 2vmin, 24px); }
+.screen-list { list-style: none; display: flex; flex-direction: column; gap: 1.2vmin; flex: 1; }
+.screen-row { display: flex; align-items: center; gap: 2vmin; padding: 1.2vmin 2.2vmin; border: 2px solid rgba(255,255,255,0.08); border-radius: 16px; background: rgba(255,255,255,0.03); transition: background 0.4s, transform 0.4s; }
+.screen-row.bumped { background: rgba(0,230,118,0.2); transform: scale(1.01); }
+.screen-rank { width: 6vmin; font-size: clamp(20px, 4vmin, 56px); font-weight: 900; color: var(--green-primary); text-align: center; }
+.screen-avatar { width: clamp(36px, 7vmin, 96px); height: clamp(36px, 7vmin, 96px); flex-shrink: 0; }
+.screen-avatar svg { width: 100%; height: 100%; }
+.screen-name { flex: 1; font-size: clamp(18px, 3.6vmin, 52px); font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.screen-role { font-size: clamp(11px, 1.8vmin, 24px); font-weight: 800; border: 1.5px solid; border-radius: 999px; padding: 0.3vmin 1.4vmin; text-transform: uppercase; }
+.screen-points { font-size: clamp(22px, 4.4vmin, 64px); font-weight: 900; min-width: 10vmin; text-align: right; }
+.screen-empty { text-align: center; color: var(--text-muted); font-size: clamp(16px, 3vmin, 36px); padding: 6vmin 0; }
+@media (max-width: 600px) { .screen-head { flex-direction: column; align-items: flex-start; } }

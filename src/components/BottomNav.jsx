@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Home, Users, QrCode, UserCheck, Trophy, Sparkles } from 'lucide-react';
 
 export const BottomNav = () => {
-  const { currentTab, setCurrentTab, setActiveModal, pendingHandshakes } = useApp();
+  const { currentTab, setCurrentTab, setActiveModal } = useApp();
 
   return (
     <nav className="bottom-dock">
@@ -46,18 +46,6 @@ export const BottomNav = () => {
       >
         <UserCheck size={20} />
         <span>Plug</span>
-        {pendingHandshakes.length > 0 && (
-          <span style={{
-            position: 'absolute',
-            top: '4px',
-            right: '18px',
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            backgroundColor: '#00E676',
-            boxShadow: '0 0 8px #00E676'
-          }} />
-        )}
       </button>
 
       {/* 5. Board (Leaderboards & Hub Wars) */}
