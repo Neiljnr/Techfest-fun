@@ -476,14 +476,20 @@ export const AppProvider = ({ children }) => {
       showToast('Backend setup required', 'Add the Neon Auth and Data API URLs to the environment before looking up registrations.', 'error');
       return null;
     }
-    const { data, error } = await supabase.rpc('lookup_registration', {
-      p_identifier: String(identifier || '').trim()
-    });
-    if (error) {
+    let response;
+    try {
+      response = await fetch('/api/lookup-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: String(identifier || '').trim() })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'Could not search registrations. Please try again.');
+      return data;
+    } catch (error) {
       showError('Registration lookup failed', error);
       return null;
     }
-    return data;
   };
 
   const signUpWithPassword = async ({ name, email, password, role, registrationEmail, attendeeType, organization }) => {

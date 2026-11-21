@@ -10,7 +10,7 @@ TechFest Quest is a React/Vite event application backed by Neon Auth and Neon Po
    - `VITE_NEON_AUTH_URL`: the Neon Auth URL.
    - `VITE_NEON_DATA_API_URL`: the Neon Data API URL.
    - `SCREEN_DATABASE_URL` (server-only, Vercel): connection string of the read-only `screen_reader` role. It powers `/api/leaderboard` and the public big-screen page at `/screen`. Apply `neon/migrations/202611060001_instant_connections.sql` after the base migration.
-4. Create a dedicated `quest_sync` role in Quest's `neondb` and grant it `USAGE` on `public` plus `INSERT, UPDATE` on `public.quest_registration_lookup`. Put its connection string in the registration site's server-only `QUEST_DATABASE_URL`; never place it in Vite variables. In the registration admin session, POST `{ "offset": 0 }` to `/api/admin/sync-quest`, then continue with each returned `nextOffset` until it is `null`. New registrations sync when submitted.
+4. Create a dedicated `quest_sync` role in Quest's `neondb` and grant it `USAGE` on `public` plus `SELECT, INSERT, UPDATE` on `public.quest_registration_lookup` (the lookup and upsert need these permissions). Set its connection string as the server-only `QUEST_DATABASE_URL` in **both** Vercel projects: Quest uses it for pre-login registration lookup, and the registration site uses it to mirror new and existing registrations. Never put it in a `VITE_` variable. In the registration admin session, POST `{ "offset": 0 }` to `/api/admin/sync-quest`, then continue with each returned `nextOffset` until it is `null`. New registrations sync when submitted.
 5. Add the production URL as a trusted origin in Neon Auth (localhost is allowed for development).
 5. Run `npm install`, then `npm run dev`.
 
