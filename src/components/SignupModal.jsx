@@ -40,7 +40,7 @@ export const SignupModal = () => {
     event.preventDefault();
     const query = identifier.trim();
     if (!query) {
-      showToast('Enter your details', 'Type your name or email used during Techfest registration.', 'warning');
+      showToast('Enter your email', 'Type the email address used during Techfest registration.', 'warning');
       return;
     }
     setIsSubmitting(true);
@@ -55,7 +55,7 @@ export const SignupModal = () => {
       } else {
         showToast(
           'Not found',
-          'No Techfest registration matches that name or email. Please register at the Techfest site first, or sign in if you already have a quest account.',
+          'No Techfest registration matches that email. Please register at the Techfest site first, or sign in if you already have a quest account.',
           'warning'
         );
       }
@@ -129,15 +129,15 @@ export const SignupModal = () => {
           </div>
           <form onSubmit={handleLookup} className="modal-body" style={{ gap: '16px' }}>
             <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5 }}>
-              Enter the <strong>name</strong> or <strong>email</strong> you used to register for TechFest.
+              Enter the <strong>email address</strong> you used to register for TechFest.
               We'll find your registration and set up your quest account automatically.
             </p>
             <label style={labelStyle}>
-              Your name or email
+              Registration email
               <input
-                autoComplete="email" required maxLength={120} value={identifier}
+                type="email" autoComplete="email" required maxLength={120} value={identifier}
                 onChange={event => setIdentifier(event.target.value)}
-                placeholder="e.g. john@example.com or John Doe"
+                placeholder="you@example.com"
                 style={inputStyle}
                 autoFocus
               />

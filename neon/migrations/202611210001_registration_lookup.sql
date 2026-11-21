@@ -4,10 +4,22 @@
 
 --------------------------------------------------------------------------------
 -- 1. lookup_registration(p_identifier text)
---    Searches techfest_registrations by email (exact, case-insensitive) first,
---    then by full_name (case-insensitive, trimmed). Returns limited info for privacy.
+--    Searches techfest_registrations by email (exact, case-insensitive).
+--    Names are not unique and must not expose registrant details to strangers.
 --    Callable by anon (pre-auth) and authenticated roles.
 --------------------------------------------------------------------------------
+
+-- The registration site has its own Neon project. Its server mirrors only the
+-- account-setup fields into this private table.
+create table if not exists public.quest_registration_lookup (
+  email text primary key check (email = lower(email)),
+  full_name text not null,
+  attendee_type text not null,
+  organization text,
+  registration_type text not null check (registration_type in ('attendee', 'speaker', 'vendor')),
+  synced_at timestamptz not null default now()
+);
+revoke all on public.quest_registration_lookup from public, anonymous, authenticated;
 
 create or replace function public.lookup_registration(p_identifier text)
 returns jsonb
@@ -28,18 +40,9 @@ begin
   -- Try email match first (exact, case-insensitive)
   select full_name, email, attendee_type, organization, registration_type
     into reg
-    from public.techfest_registrations
-   where lower(email) = identifier_trimmed
+    from public.quest_registration_lookup
+   where email = identifier_trimmed
    limit 1;
-
-  if not found then
-    -- Fall back to full_name match (case-insensitive, trimmed)
-    select full_name, email, attendee_type, organization, registration_type
-      into reg
-      from public.techfest_registrations
-     where lower(trim(full_name)) = identifier_trimmed
-     limit 1;
-  end if;
 
   if not found then
     return jsonb_build_object('found', false);
@@ -58,7 +61,8 @@ end;
 $$;
 
 -- Grant execute to both anon and authenticated roles
-grant execute on function public.lookup_registration(text) to anon;
+revoke all on function public.lookup_registration(text) from public;
+grant execute on function public.lookup_registration(text) to anonymous;
 grant execute on function public.lookup_registration(text) to authenticated;
 
 --------------------------------------------------------------------------------
@@ -69,15 +73,16 @@ alter table public.profiles
   add column if not exists registration_email text;
 
 --------------------------------------------------------------------------------
--- 3. Update ensure_profile to accept p_attendee_type and p_organization,
---    storing them in bio and company when those fields are empty.
+-- 3. Update ensure_profile to accept registration info and link the authenticated
+--    account to its registration. The registration email must match Auth email.
 --------------------------------------------------------------------------------
 
 create or replace function public.ensure_profile(
   p_name text default null,
   p_role text default null,
   p_attendee_type text default null,
-  p_organization text default null
+  p_organization text default null,
+  p_registration_email text default null
 )
 returns public.profiles
 language plpgsql
@@ -88,6 +93,7 @@ declare
   account_email text;
   profile_name text;
   profile_role text;
+  registration public.quest_registration_lookup;
   result public.profiles;
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
@@ -114,6 +120,19 @@ begin
   select email into account_email from neon_auth."user" where id = auth.uid();
   if not found then raise exception 'Account not found'; end if;
 
+  if p_registration_email is null or lower(trim(p_registration_email)) <> lower(account_email) then
+    raise exception 'Use the email address from your TechFest registration';
+  end if;
+
+  select * into registration
+    from public.quest_registration_lookup
+   where email = lower(account_email)
+   limit 1;
+  if not found then raise exception 'No TechFest registration matches this account email'; end if;
+
+  p_attendee_type := coalesce(p_attendee_type, registration.attendee_type);
+  p_organization := coalesce(p_organization, registration.organization);
+
   profile_name := left(trim(coalesce(nullif(trim(p_name), ''), split_part(account_email, '@', 1))), 60);
   if profile_name = '' then profile_name := 'Attendee'; end if;
 
@@ -122,13 +141,14 @@ begin
     profile_role := 'builder';
   end if;
 
-  insert into public.profiles (id, name, role, bio, company)
+  insert into public.profiles (id, name, role, bio, company, registration_email)
   values (
     auth.uid(),
     profile_name,
     profile_role,
     coalesce(case when p_attendee_type is not null then 'Techfest: ' || p_attendee_type end, ''),
-    coalesce(p_organization, '')
+    coalesce(p_organization, ''),
+    lower(account_email)
   )
   on conflict (id) do nothing;
 
@@ -144,6 +164,14 @@ end;
 $$;
 
 
--- Re-grant execute on the updated ensure_profile (now has 4 params)
-revoke all on function public.ensure_profile(text, text, text, text) from public;
-grant execute on function public.ensure_profile(text, text, text, text) to authenticated;
+-- Remove access to older overloads and grant only the registration-linked version.
+do $$
+begin
+  if to_regprocedure('public.ensure_profile(text,text,text,text)') is not null then
+    execute 'revoke all on function public.ensure_profile(text, text, text, text) from public';
+  end if;
+end;
+$$;
+revoke all on function public.ensure_profile(text, text) from public, authenticated;
+revoke all on function public.ensure_profile(text, text, text, text, text) from public;
+grant execute on function public.ensure_profile(text, text, text, text, text) to authenticated;

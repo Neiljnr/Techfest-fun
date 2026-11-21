@@ -236,7 +236,8 @@ export const AppProvider = ({ children }) => {
           p_name: hasPending ? pending.name : null,
           p_role: hasPending ? pending.role : null,
           p_attendee_type: hasPending ? (pending.attendeeType || null) : null,
-          p_organization: hasPending ? (pending.organization || null) : null
+          p_organization: hasPending ? (pending.organization || null) : null,
+          p_registration_email: hasPending ? (pending.registrationEmail || pending.email || null) : null
         });
         if (profileError) throw profileError;
         localStorage.removeItem(PENDING_SIGNUP_KEY);
