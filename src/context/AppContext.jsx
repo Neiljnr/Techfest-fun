@@ -234,7 +234,9 @@ export const AppProvider = ({ children }) => {
       if (hasPending || results[0].error || results[1].error) {
         const { error: profileError } = await supabase.rpc('ensure_profile', {
           p_name: hasPending ? pending.name : null,
-          p_role: hasPending ? pending.role : null
+          p_role: hasPending ? pending.role : null,
+          p_attendee_type: hasPending ? (pending.attendeeType || null) : null,
+          p_organization: hasPending ? (pending.organization || null) : null
         });
         if (profileError) throw profileError;
         localStorage.removeItem(PENDING_SIGNUP_KEY);
@@ -468,11 +470,31 @@ export const AppProvider = ({ children }) => {
     return true;
   };
 
-  const signUpWithPassword = async ({ name, email, password, role }) => {
+  const lookupRegistration = async (identifier) => {
+    if (!isSupabaseConfigured) {
+      showToast('Backend setup required', 'Add the Neon Auth and Data API URLs to the environment before looking up registrations.', 'error');
+      return null;
+    }
+    const { data, error } = await supabase.rpc('lookup_registration', {
+      p_identifier: String(identifier || '').trim()
+    });
+    if (error) {
+      showError('Registration lookup failed', error);
+      return null;
+    }
+    return data;
+  };
+
+  const signUpWithPassword = async ({ name, email, password, role, registrationEmail, attendeeType, organization }) => {
     if (!isSupabaseConfigured) return false;
     const normalizedEmail = String(email || '').trim().toLowerCase();
     localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
-      email: normalizedEmail, name: String(name || '').trim(), role
+      email: normalizedEmail,
+      name: String(name || '').trim(),
+      role,
+      registrationEmail: registrationEmail || normalizedEmail,
+      attendeeType: attendeeType || null,
+      organization: organization || null
     }));
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
@@ -888,6 +910,7 @@ export const AppProvider = ({ children }) => {
     sendLoginCode,
     signInWithPassword,
     signUpWithPassword,
+    lookupRegistration,
     verifyLoginCode,
     signOut,
     modalData,
