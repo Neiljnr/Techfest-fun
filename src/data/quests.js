@@ -7,8 +7,8 @@ export const STAGES = [
     number: 1,
     title: 'Boot Up',
     subtitle: 'Socials & Warmup',
-    tagline: '"Every system needs a signal."',
-    flavor: 'Follow the channels, post your hype, warm up your operator engine before entering Sarau Center.',
+    tagline: '"Catch the signal. Rally your crew. Boot up."',
+    flavor: 'Kick off the quest by finding TechFest and its community across seven social channels. Stack points, share the hype, and unlock the event floor.',
     color: '#00E676', // TechFest Green
     bgGlow: 'rgba(0, 230, 118, 0.15)',
     cap: 40,
@@ -67,8 +67,8 @@ export const INITIAL_STAGE1_QUESTS = [
   {
     id: 'q-follow-x',
     title: 'Follow TechFest on X',
-    actionText: 'Follow @TechFestJos',
-    targetUrl: 'https://x.com/TechFestJos',
+    actionText: 'Follow @jostechfest',
+    targetUrl: 'https://x.com/jostechfest',
     points: 5,
     rule: 'Self-declared with spot checks',
     type: 'social_follow',
@@ -77,13 +77,68 @@ export const INITIAL_STAGE1_QUESTS = [
   },
   {
     id: 'q-follow-li',
-    title: 'Follow TechFest on LinkedIn',
-    actionText: 'Follow Jos TechFest Page',
-    targetUrl: 'https://linkedin.com/company/jos-techfest',
+    title: 'Follow Jos TechFest on LinkedIn',
+    actionText: 'Open the Jos TechFest showcase',
+    targetUrl: 'https://www.linkedin.com/showcase/jos-techfest/',
     points: 5,
     rule: 'Self-declared with spot checks',
     type: 'social_follow',
     platform: 'LinkedIn',
+    completed: false
+  },
+  {
+    id: 'q-follow-fb-techfest',
+    title: 'Find TechFest on Facebook',
+    actionText: 'Follow TechFest Jos',
+    targetUrl: 'https://web.facebook.com/techfestjos',
+    points: 3,
+    rule: 'Self-declared with spot checks',
+    type: 'social_follow',
+    platform: 'Facebook',
+    completed: false
+  },
+  {
+    id: 'q-follow-fb-community',
+    title: 'Unlock the Facebook community signal',
+    actionText: 'Open the TechFest community page',
+    targetUrl: 'https://web.facebook.com/profile.php?id=61583286609274',
+    points: 3,
+    rule: 'Self-declared with spot checks',
+    type: 'social_follow',
+    platform: 'Facebook',
+    completed: false
+  },
+  {
+    id: 'q-follow-axiahub',
+    title: 'Connect with AxiaHub',
+    actionText: 'Follow AxiaHub',
+    targetUrl: 'https://web.facebook.com/axiahub',
+    points: 3,
+    rule: 'Self-declared with spot checks',
+    type: 'social_follow',
+    platform: 'Facebook',
+    completed: false
+  },
+  {
+    id: 'q-follow-bluehouse',
+    title: 'Connect with Bluehouse Technologies',
+    actionText: 'Follow Bluehouse Technologies',
+    targetUrl: 'https://web.facebook.com/BluehouseTechnologies',
+    points: 3,
+    rule: 'Self-declared with spot checks',
+    type: 'social_follow',
+    platform: 'Facebook',
+    completed: false
+  },
+  {
+    id: 'q-follow-nhub',
+    title: 'Connect with nHub Nigeria',
+    actionText: 'Follow nHub Nigeria',
+    targetUrl: 'https://web.facebook.com/nHubNigeria',
+    points: 3,
+    rule: 'Self-declared with spot checks',
+    type: 'social_follow',
+    platform: 'Facebook',
     completed: false
   },
   {
