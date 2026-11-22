@@ -13,7 +13,9 @@ import {
   Send, 
   Award,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Camera,
+  QrCode
 } from 'lucide-react';
 
 export const StageDetailModal = () => {
@@ -252,20 +254,22 @@ export const StageDetailModal = () => {
 
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button 
+                  type="button"
                   className="pill-btn-action pill-btn-primary"
-                  onClick={() => {
-                    setActiveModal('operator_card');
-                  }}
+                  aria-label="Open the QR scanner"
+                  onClick={() => setActiveModal('scanner')}
                 >
-                  Show My QR Code
+                  <Camera size={16} />
+                  Open Scanner
                 </button>
                 <button 
+                  type="button"
                   className="pill-btn-action pill-btn-secondary"
-                  onClick={() => {
-                    setActiveModal('scanner');
-                  }}
+                  aria-label="Show my attendee QR pass"
+                  onClick={() => setActiveModal('operator_card')}
                 >
-                  Open Scanner
+                  <QrCode size={16} />
+                  Show My QR Code
                 </button>
               </div>
 
