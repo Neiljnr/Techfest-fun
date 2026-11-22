@@ -42,7 +42,13 @@ export default async function handler(request, response) {
     const identity = digest(QUEST_GUEST_AUTH_SECRET, 'identity', email);
     const authEmail = `guest-${identity.slice(0, 36)}@quest.invalid`;
     const password = digest(QUEST_GUEST_AUTH_SECRET, 'credential', email);
-    const client = createClient({ auth: { url: VITE_NEON_AUTH_URL }, dataApi: { url: VITE_NEON_DATA_API_URL } });
+    const client = createClient({
+      auth: {
+        url: VITE_NEON_AUTH_URL,
+        fetchOptions: { headers: { Origin: 'https://techfest-fun.vercel.app' } }
+      },
+      dataApi: { url: VITE_NEON_DATA_API_URL }
+    });
     let { data, error } = await client.auth.signInWithPassword({ email: authEmail, password });
     if (error) {
       const signup = await client.auth.signUp({
