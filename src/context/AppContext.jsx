@@ -50,7 +50,7 @@ const saveOfflineQueue = (queue) => {
 const mapProfile = (profile, authUser) => ({
   id: profile.id,
   name: profile.name,
-  email: authUser.email || '',
+  email: profile.registration_email || authUser.email || '',
   role: profile.role,
   avatarId: profile.avatar_id,
   ticketType: 'attendee',
@@ -213,7 +213,7 @@ export const AppProvider = ({ children }) => {
     }
     try {
       const pending = readPendingSignup();
-      const hasPending = pending?.email === authUser.email?.toLowerCase();
+      const hasPending = (pending?.authEmail || pending?.email)?.toLowerCase() === authUser.email?.toLowerCase();
       // One parallel round trip. Staff-only views simply return nothing for normal attendees.
       const fetchAll = () => Promise.all([
         supabase.from('profiles').select('*').eq('id', authUser.id).single(),
@@ -450,19 +450,13 @@ export const AppProvider = ({ children }) => {
     }
   }, [offlineQueue]);
 
-  const sendLoginCode = async ({ name, email, role, createAccount }) => {
+  const sendLoginCode = async ({ email }) => {
     if (!isSupabaseConfigured) {
       showToast('Backend setup required', 'Add the Neon Auth and Data API URLs to the environment before signing in.', 'error');
       return false;
     }
     const normalizedEmail = String(email || '').trim().toLowerCase();
-    if (createAccount) {
-      localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
-        email: normalizedEmail, name: String(name || '').trim(), role
-      }));
-    }
-    const options = { shouldCreateUser: Boolean(createAccount) };
-    const { error } = await supabase.auth.signInWithOtp({ email: normalizedEmail, options });
+    const { error } = await supabase.auth.signInWithOtp({ email: normalizedEmail, options: { shouldCreateUser: false } });
     if (error) {
       showError('Could not send verification code', error);
       return false;
@@ -481,7 +475,7 @@ export const AppProvider = ({ children }) => {
       response = await fetch('/api/lookup-registration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: String(identifier || '').trim() })
+        body: JSON.stringify({ identifier: String(identifier || '').trim() })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || 'Could not search registrations. Please try again.');
@@ -492,42 +486,32 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const signUpWithPassword = async ({ name, email, password, role, registrationEmail, attendeeType, organization }) => {
-    if (!isSupabaseConfigured) return false;
-    const normalizedEmail = String(email || '').trim().toLowerCase();
-    localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
-      email: normalizedEmail,
-      name: String(name || '').trim(),
-      role,
-      registrationEmail: registrationEmail || normalizedEmail,
-      attendeeType: attendeeType || null,
-      organization: organization || null
-    }));
-    const { data, error } = await supabase.auth.signUp({
-      email: normalizedEmail,
-      password,
-      options: { data: { name: String(name || '').trim() } }
-    });
-    if (error) {
-      showError('Could not create account', error);
+  const loginAttendee = async (registration) => {
+    if (!isSupabaseConfigured || !registration?.email || !registration?.full_name) return false;
+    const role = registration.role || 'builder';
+    try {
+      const response = await fetch('/api/attendee-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: registration.email, name: registration.full_name })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error || 'Could not start your Quest session.');
+      const authEmail = result.session?.user?.email;
+      localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
+        email: registration.email.toLowerCase(), authEmail,
+        registrationEmail: registration.email.toLowerCase(), name: registration.full_name,
+        role, attendeeType: registration.attendee_type || null,
+        organization: registration.organization || null
+      }));
+      const { data, error } = await supabase.auth.setSession(result.session);
+      if (error) throw error;
+      setSession(data?.session || result.session);
+      return true;
+    } catch (error) {
+      showError('Could not enter Quest', error);
       return false;
     }
-    if (data?.session) setSession(data.session);
-    return true;
-  };
-
-  const signInWithPassword = async ({ email, password }) => {
-    if (!isSupabaseConfigured) return false;
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: String(email || '').trim().toLowerCase(),
-      password
-    });
-    if (error) {
-      showError('Could not sign in', error);
-      return false;
-    }
-    if (data?.session) setSession(data.session);
-    return true;
   };
 
   const verifyLoginCode = async (email, token) => {
@@ -915,9 +899,8 @@ export const AppProvider = ({ children }) => {
     startSignup: () => { setSignupInvite(null); setActiveModal('signup'); },
     cancelSignup: () => setActiveModal(null),
     sendLoginCode,
-    signInWithPassword,
-    signUpWithPassword,
     lookupRegistration,
+    loginAttendee,
     verifyLoginCode,
     signOut,
     modalData,

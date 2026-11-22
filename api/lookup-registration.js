@@ -10,9 +10,9 @@ export default async function handler(request, response) {
     return;
   }
 
-  const email = String(request.body?.email || '').trim().toLowerCase();
-  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    response.status(400).json({ error: 'Enter the email address used for your TechFest registration.' });
+  const identifier = String(request.body?.identifier || '').trim();
+  if (!identifier || identifier.length > 254) {
+    response.status(400).json({ error: 'Enter the name or email used for your TechFest registration.' });
     return;
   }
   if (!process.env.QUEST_DATABASE_URL) {
@@ -22,17 +22,28 @@ export default async function handler(request, response) {
 
   try {
     const sql = neon(process.env.QUEST_DATABASE_URL);
-    const [registration] = await sql`
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
+    const rows = isEmail ? await sql`
       SELECT full_name, email, attendee_type, organization, registration_type
       FROM public.quest_registration_lookup
-      WHERE email = ${email}
+      WHERE email = ${identifier.toLowerCase()}
       LIMIT 1
+    ` : await sql`
+      SELECT full_name, email, attendee_type, organization, registration_type
+      FROM public.quest_registration_lookup
+      WHERE lower(trim(full_name)) = lower(trim(${identifier}))
+      ORDER BY full_name, email
+      LIMIT 6
     `;
-    if (!registration) {
+    if (rows.length === 0) {
       response.status(200).json({ found: false });
       return;
     }
-    response.status(200).json({ found: true, ...registration });
+    if (rows.length > 1) {
+      response.status(200).json({ found: false, matches: rows });
+      return;
+    }
+    response.status(200).json({ found: true, ...rows[0] });
   } catch (error) {
     console.error('Quest registration lookup failed', error);
     response.status(503).json({ error: 'Registration lookup is temporarily unavailable. Please try again.' });
