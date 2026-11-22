@@ -5,14 +5,14 @@ TechFest Quest is a React/Vite event application backed by Neon Auth and Neon Po
 ## Local setup
 
 1. Create a Neon project and enable **Auth** and the **Data API** (public schema, `neon_auth` provider). Configure a production SMTP sender in Neon Auth before opening registration; the shared sender is for development only.
-2. Apply Quest migrations in order: [`202611050001_event_backend.sql`](./neon/migrations/202611050001_event_backend.sql), [`202611060001_instant_connections.sql`](./neon/migrations/202611060001_instant_connections.sql), [`202611060002_stages_and_quiz.sql`](./neon/migrations/202611060002_stages_and_quiz.sql), [`202611210001_registration_lookup.sql`](./neon/migrations/202611210001_registration_lookup.sql), [`202611220001_stage1_community_quests.sql`](./neon/migrations/202611220001_stage1_community_quests.sql), and [`202611220002_guest_passwordless_login.sql`](./neon/migrations/202611220002_guest_passwordless_login.sql). Registration records are mirrored into Quest's private `quest_registration_lookup` table. Backfill existing registrations before inviting users.
+2. Apply Quest migrations in order: [`202611050001_event_backend.sql`](./neon/migrations/202611050001_event_backend.sql), [`202611060001_instant_connections.sql`](./neon/migrations/202611060001_instant_connections.sql), [`202611060002_stages_and_quiz.sql`](./neon/migrations/202611060002_stages_and_quiz.sql), [`202611210001_registration_lookup.sql`](./neon/migrations/202611210001_registration_lookup.sql), [`202611220001_stage1_community_quests.sql`](./neon/migrations/202611220001_stage1_community_quests.sql), [`202611220002_guest_passwordless_login.sql`](./neon/migrations/202611220002_guest_passwordless_login.sql), and [`202611220003_prompt_blitz_15_questions.sql`](./neon/migrations/202611220003_prompt_blitz_15_questions.sql). Registration records are mirrored into Quest's private `quest_registration_lookup` table. Backfill existing registrations before inviting users.
 3. Copy `.env.example` to `.env.local` and set:
    - `VITE_NEON_AUTH_URL`: the Neon Auth URL.
    - `VITE_NEON_DATA_API_URL`: the Neon Data API URL.
    - `SCREEN_DATABASE_URL` (server-only, Vercel): connection string of the read-only `screen_reader` role. It powers `/api/leaderboard` and the public big-screen page at `/screen`. Apply `neon/migrations/202611060001_instant_connections.sql` after the base migration.
 4. Set the dedicated `quest_sync` connection as server-only `QUEST_DATABASE_URL` in **both** Vercel projects. It needs `SELECT, INSERT, UPDATE` on `quest_registration_lookup`; Quest also needs `SELECT, INSERT` on `quest_guest_accounts`. In Quest Vercel, set `QUEST_GUEST_AUTH_SECRET` to a long random secret and keep it stable. Never use a `VITE_` prefix for server secrets. In the registration admin session, POST `{ "offset": 0 }` to `/api/admin/sync-quest`, then continue with each returned `nextOffset` until `nextOffset` is `null`. New registrations sync when submitted.
 5. Add the production URL as a trusted origin in Neon Auth (localhost is allowed for development).
-5. Run `npm install`, then `npm run dev`.
+6. Run `npm install`, then `npm run dev`.
 
 The browser configuration must contain only these two public URLs. Never put a database connection string or API key in Vite environment variables or Vercel client-side settings.
 

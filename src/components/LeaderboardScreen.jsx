@@ -303,7 +303,7 @@ export const LeaderboardScreen = () => {
         </div>
       )}
 
-      {/* FOUNDER TRACK BOARD (Day 2) */}
+      {/* FOUNDER TRACK BOARD */}
       {activeBoardTab === 'founder' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{
@@ -314,7 +314,7 @@ export const LeaderboardScreen = () => {
             fontSize: '12.5px',
             color: 'var(--text-light)'
           }}>
-            🚀 <strong>Day 2 Founder Track</strong> rewards executive roundtable engagement, open demos, and warm introductions (Cap: 200 pts).
+            🚀 <strong>Founder Track</strong> rewards executive roundtable engagement, open demos, and warm introductions (Cap: 200 pts).
           </div>
 
           {founderBoardList.map((f, idx) => (

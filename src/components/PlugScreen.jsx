@@ -134,7 +134,7 @@ export const PlugScreen = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Briefcase size={18} color="#00B0FF" />
             <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#FFF' }}>
-              Day 2: Founder Roundtable
+              Founder Roundtable
             </h4>
           </div>
           <span style={{ fontSize: '11px', fontWeight: '800', color: '#00B0FF' }}>
