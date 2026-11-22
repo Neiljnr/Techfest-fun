@@ -54,8 +54,8 @@ export const OperatorCardModal = () => {
       <div 
         className="modal-sheet" 
         style={{ 
-          height: '88vh', 
-          maxHeight: '88vh',
+          height: '88dvh',
+          maxHeight: '88dvh',
           background: '#080C09'
         }}
       >
@@ -74,15 +74,21 @@ export const OperatorCardModal = () => {
         </div>
 
         {/* Body */}
-        <div className="modal-body" style={{ alignItems: 'center' }}>
+        <div className="modal-body" style={{
+          alignItems: 'center',
+          minHeight: 0,
+          gap: '12px',
+          padding: '12px 16px calc(16px + env(safe-area-inset-bottom))'
+        }}>
           {/* Holographic Operator Card Visual */}
           <div style={{
             width: '100%',
             maxWidth: '340px',
+            flexShrink: 0,
             background: 'linear-gradient(135deg, #101F16 0%, #08120B 100%)',
             border: '2px solid rgba(0, 230, 118, 0.4)',
             borderRadius: '24px',
-            padding: '24px 20px',
+            padding: '16px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -95,7 +101,7 @@ export const OperatorCardModal = () => {
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #00E676, #00B0FF, #FFD700)' }} />
 
             {/* Event Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '8px' }}>
               <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1px', color: 'var(--green-primary)', textTransform: 'uppercase' }}>
                 JOS TECHFEST 2026
               </span>
@@ -108,22 +114,22 @@ export const OperatorCardModal = () => {
             <div 
               className="avatar-thumbnail"
               style={{
-                width: '84px',
-                height: '84px',
+                width: 'clamp(56px, 9dvh, 72px)',
+                height: 'clamp(56px, 9dvh, 72px)',
                 borderWidth: '3px',
                 borderColor: currentRank.color,
                 boxShadow: `0 0 25px ${currentRank.color}44`,
-                marginBottom: '12px'
+                marginBottom: '8px'
               }}
               dangerouslySetInnerHTML={{ __html: avatarMeta.svg }}
             />
 
             {/* Name & Title */}
-            <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#FFF' }}>
+              <h3 style={{ fontSize: 'clamp(17px, 2.4dvh, 20px)', fontWeight: '800', color: '#FFF' }}>
               {user.name}
             </h3>
 
-            <div style={{ display: 'flex', gap: '6px', margin: '6px 0 14px 0' }}>
+            <div style={{ display: 'flex', gap: '6px', margin: '4px 0 8px 0' }}>
               <span className={`role-chip ${user.role}`}>
                 {user.role}
               </span>
@@ -148,8 +154,8 @@ export const OperatorCardModal = () => {
               background: 'rgba(0, 0, 0, 0.4)',
               border: '1px solid rgba(255, 255, 255, 0.06)',
               borderRadius: '12px',
-              padding: '10px',
-              marginBottom: '14px'
+              padding: '8px',
+              marginBottom: '8px'
             }}>
               <div>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
@@ -173,28 +179,28 @@ export const OperatorCardModal = () => {
             {/* QR Code */}
             {qrDataUrl && (
               <div style={{
-                padding: '8px',
+                padding: '6px',
                 background: '#FFFFFF',
                 borderRadius: '14px',
                 border: '1px solid rgba(0, 230, 118, 0.3)',
                 boxShadow: '0 0 15px rgba(0, 230, 118, 0.15)',
-                marginBottom: '10px'
+                marginBottom: '6px'
               }}>
                 <img 
                   src={qrDataUrl} 
                   alt="Operator QR" 
-                  style={{ width: '200px', height: '200px', display: 'block', imageRendering: 'pixelated' }} 
+                  style={{ width: 'min(180px, 42vw, 20dvh)', height: 'min(180px, 42vw, 20dvh)', display: 'block', imageRendering: 'pixelated' }} 
                 />
               </div>
             )}
 
-            <span style={{ fontSize: '10px', fontFamily: 'monospace', color: 'var(--text-dim)' }}>
+            <span style={{ maxWidth: '100%', overflowWrap: 'anywhere', fontSize: '10px', fontFamily: 'monospace', color: 'var(--text-dim)' }}>
               PASS ID: {user.qrToken}
             </span>
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '340px' }}>
+          <div style={{ display: 'flex', flexShrink: 0, gap: '10px', width: '100%', maxWidth: '340px' }}>
             <button
               className="pill-btn-action pill-btn-primary"
               style={{ flex: 1 }}
