@@ -497,16 +497,17 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result?.error || 'Could not start your Quest session.');
-      const authEmail = result.session?.user?.email;
+      const authEmail = result.credentials?.email;
+      if (!authEmail || !result.credentials?.password) throw new Error('Could not prepare your Quest account. Please try again.');
       localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
         email: registration.email.toLowerCase(), authEmail,
         registrationEmail: registration.email.toLowerCase(), name: registration.full_name,
         role, attendeeType: registration.attendee_type || null,
         organization: registration.organization || null
       }));
-      const { data, error } = await supabase.auth.setSession(result.session);
+      const { data, error } = await supabase.auth.signInWithPassword(result.credentials);
       if (error) throw error;
-      setSession(data?.session || result.session);
+      if (data?.session) setSession(data.session);
       return true;
     } catch (error) {
       showError('Could not enter Quest', error);

@@ -8,6 +8,8 @@ create table if not exists public.quest_guest_accounts (
 );
 revoke all on public.quest_guest_accounts from public, anonymous, authenticated;
 grant select, insert on public.quest_guest_accounts to quest_sync;
+grant usage on schema neon_auth to quest_sync;
+grant select (id, email) on table neon_auth."user" to quest_sync;
 
 create or replace function public.ensure_profile(
   p_name text default null,

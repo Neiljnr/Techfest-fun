@@ -49,8 +49,8 @@ export default async function handler(request, response) {
       },
       dataApi: { url: VITE_NEON_DATA_API_URL }
     });
-    let { data, error } = await client.auth.signInWithPassword({ email: authEmail, password });
-    if (error) {
+    let { error: authError } = await client.auth.signInWithPassword({ email: authEmail, password });
+    if (authError && authError.code !== 'session_not_found') {
       const signup = await client.auth.signUp({
         email: authEmail,
         password,
@@ -59,34 +59,29 @@ export default async function handler(request, response) {
           data: { name: rows[0].full_name }
         }
       });
-      data = signup.data;
-      error = signup.error;
-      if (!error && !data?.session) {
-        const retry = await client.auth.signInWithPassword({ email: authEmail, password });
-        data = retry.data;
-        error = retry.error;
-      }
+      authError = signup.error;
     }
-    if (error || !data?.session?.access_token || !data?.session?.refresh_token) {
-      console.error('Passwordless attendee auth failed', error);
+    // In a serverless function the Better Auth cookie cannot be retained by this
+    // adapter. `session_not_found` means the credentials were accepted, but the
+    // browser must perform the actual sign-in to persist its own session.
+    if (authError && authError.code !== 'session_not_found') {
+      console.error('Passwordless attendee auth failed', authError);
       response.status(503).json({ error: 'Could not start your Quest session. Please try again.' });
       return;
     }
 
+    const [authUser] = await sql`
+      SELECT id FROM neon_auth."user" WHERE email = ${authEmail} LIMIT 1
+    `;
+    if (!authUser) throw new Error('Quest auth identity was not created.');
+
     await sql`
       INSERT INTO public.quest_guest_accounts (user_id, registration_email)
-      VALUES (${data.user.id}::uuid, ${email})
+      VALUES (${authUser.id}::uuid, ${email})
       ON CONFLICT (user_id) DO NOTHING
     `;
     response.status(200).json({
-      session: {
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-        token_type: data.session.token_type,
-        expires_in: data.session.expires_in,
-        expires_at: data.session.expires_at,
-        user: data.user
-      },
+      credentials: { email: authEmail, password },
       registration: rows[0]
     });
   } catch (error) {
