@@ -45,7 +45,14 @@ export default async function handler(request, response) {
     const client = createClient({ auth: { url: VITE_NEON_AUTH_URL }, dataApi: { url: VITE_NEON_DATA_API_URL } });
     let { data, error } = await client.auth.signInWithPassword({ email: authEmail, password });
     if (error) {
-      const signup = await client.auth.signUp({ email: authEmail, password, options: { data: { name: rows[0].full_name } } });
+      const signup = await client.auth.signUp({
+        email: authEmail,
+        password,
+        options: {
+          emailRedirectTo: 'https://techfest-fun.vercel.app/',
+          data: { name: rows[0].full_name }
+        }
+      });
       data = signup.data;
       error = signup.error;
       if (!error && !data?.session) {
