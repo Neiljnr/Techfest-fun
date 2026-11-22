@@ -111,7 +111,7 @@ export const HomeScreen = () => {
         <div>
           <h2 className="welcome-title">Automate the Day</h2>
           <p className="welcome-subtitle">
-            Sarau Event Center, Jos · 26-27 Nov · Complete quests, plug into builders, and rule the board.
+            Sarau Event Center, Jos · 26 November 2026 · One-day event. Complete quests, plug into builders, and rule the board.
           </p>
         </div>
 

@@ -132,5 +132,70 @@ export const QUIZ_QUESTIONS = [
       'Agents can plan multi-step tasks, use external tools/APIs, and execute actions to achieve a goal'
     ],
     explanation: 'Autonomous agents evaluate objectives, plan sequences, execute tool calls (e.g., database writes, emails, code runs), and inspect intermediate outputs autonomously.'
+  },
+  {
+    id: 'blitz-11',
+    sponsor: 'Jos TechFest',
+    topic: 'Responsible AI',
+    question: 'Why should a high-impact AI workflow include human review for uncertain cases?',
+    options: [
+      'To make every decision slower, even when the result is clear',
+      'To review consequential or uncertain decisions and give people a path to appeal',
+      'To remove the need to measure model performance',
+      'To let the model collect any data it wants'
+    ],
+    explanation: 'Human review adds accountability where mistakes can have serious consequences, and gives people a way to challenge decisions.'
+  },
+  {
+    id: 'blitz-12',
+    sponsor: 'Jos TechFest',
+    topic: 'Cybersecurity',
+    question: 'How does multi-factor authentication help protect an account if its password is stolen?',
+    options: [
+      'It asks for another proof of identity, such as an authenticator code or security key',
+      'It makes the stolen password expire on every website',
+      'It hides the account from the internet',
+      'It automatically reverses any fraudulent payment'
+    ],
+    explanation: 'A second, separate proof of identity makes a stolen password alone less likely to be enough to access the account.'
+  },
+  {
+    id: 'blitz-13',
+    sponsor: 'Jos TechFest',
+    topic: 'Prompt Design',
+    question: 'Which instruction is most likely to produce a useful, consistent AI response?',
+    options: [
+      'Tell the model to guess what you need',
+      'Repeat the same request several times',
+      'State the goal, relevant context, constraints, and desired output format',
+      'Remove all context so the prompt is shorter'
+    ],
+    explanation: 'A clear goal, context, constraints, and output format give the model a practical target to follow.'
+  },
+  {
+    id: 'blitz-14',
+    sponsor: 'Jos TechFest',
+    topic: 'Reliable Fintech',
+    question: 'A payment request times out, so an app retries it. What does an idempotency key help prevent?',
+    options: [
+      'The payment being processed twice for the same request',
+      'The customer seeing the payment receipt',
+      'The bank applying exchange rates',
+      'The app encrypting its network connection'
+    ],
+    explanation: 'An idempotency key lets a payment service recognize a retry as the same request and avoid charging twice.'
+  },
+  {
+    id: 'blitz-15',
+    sponsor: 'Jos TechFest',
+    topic: 'Data Privacy',
+    question: 'What does data minimization mean when building a digital service?',
+    options: [
+      'Collect and keep only the personal data needed for the stated purpose',
+      'Collect every available detail in case it becomes useful later',
+      'Keep personal data forever to simplify future updates',
+      'Share user records with every connected service by default'
+    ],
+    explanation: 'Data minimization reduces privacy risk by limiting collection and retention to what the service actually needs.'
   }
 ];

@@ -827,11 +827,13 @@ export const AppProvider = ({ children }) => {
       };
     }
     if (stageNumber === 3) {
+      const questionTotal = blitzState.totalAnswered || (blitzState.completed ? 10 : 15);
+      const clearCount = Math.ceil(questionTotal / 2);
       return {
-        points: blitzState.score, cap: 150, threshold: 5, count: blitzState.correctCount,
-        isCleared: blitzState.completed && blitzState.correctCount >= 5,
+        points: blitzState.score, cap: 150, threshold: clearCount, count: blitzState.correctCount,
+        isCleared: blitzState.completed && blitzState.correctCount >= clearCount,
         progressLabel: blitzState.completed
-          ? `${blitzState.correctCount}/10 correct (${blitzState.score} pts)`
+          ? `${blitzState.correctCount}/${questionTotal} correct (${blitzState.score} pts)`
           : 'Complete the event quiz'
       };
     }
