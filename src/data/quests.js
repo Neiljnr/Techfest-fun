@@ -8,10 +8,10 @@ export const STAGES = [
     title: 'Boot Up',
     subtitle: 'Socials & Warmup',
     tagline: '"Catch the signal. Rally your crew. Boot up."',
-    flavor: 'Kick off the quest by finding TechFest and its community across seven social channels. Stack points, share the hype, and unlock the event floor.',
+    flavor: 'Kick off the quest by following TechFest and its partners. Stack points, share the hype, and unlock the event floor.',
     color: '#18D64A', // TechFest Green
     bgGlow: 'rgba(24, 214, 74, 0.15)',
-    cap: 40,
+    cap: 58,
     clearThreshold: 25,
     status: 'unlocked', // Always unlocked before event
     icon: 'Radio'
@@ -139,6 +139,72 @@ export const INITIAL_STAGE1_QUESTS = [
     rule: 'Self-declared with spot checks',
     type: 'social_follow',
     platform: 'Facebook',
+    completed: false
+  },
+  {
+    id: 'q-follow-rexc4-li',
+    title: 'Follow RexC4 on LinkedIn',
+    actionText: 'Visit RexC4 on LinkedIn',
+    targetUrl: 'https://www.linkedin.com/company/rexc4/',
+    points: 3,
+    rule: 'Self-declared with spot checks',
+    type: 'social_follow',
+    platform: 'LinkedIn',
+    completed: false
+  },
+  {
+    id: 'q-follow-rexc4-x',
+    title: 'Follow RexC4 on X',
+    actionText: 'Visit @rexc4 on X',
+    targetUrl: 'https://x.com/rexc4_',
+    points: 3,
+    rule: 'Self-declared with spot checks',
+    type: 'social_follow',
+    platform: 'X',
+    completed: false
+  },
+  {
+    id: 'q-follow-rexc4-fb',
+    title: 'Follow RexC4 on Facebook',
+    actionText: 'Visit RexC4 on Facebook',
+    targetUrl: 'https://www.facebook.com/profile.php?id=61556530644725',
+    points: 3,
+    rule: 'Self-declared with spot checks',
+    type: 'social_follow',
+    platform: 'Facebook',
+    completed: false
+  },
+  {
+    id: 'q-follow-laskadapp-fb',
+    title: 'Follow Laskad on Facebook',
+    actionText: 'Visit Laskad on Facebook',
+    targetUrl: 'https://www.facebook.com/laskadapp',
+    points: 3,
+    rule: 'Self-declared with spot checks',
+    type: 'social_follow',
+    platform: 'Facebook',
+    completed: false
+  },
+  {
+    id: 'q-follow-ajecars-ig',
+    title: 'Follow Aje Cars on Instagram',
+    actionText: 'Visit @ajecarsnigeria on Instagram',
+    targetUrl: 'https://www.instagram.com/ajecarsnigeria/',
+    points: 3,
+    rule: 'Self-declared with spot checks',
+    type: 'social_follow',
+    platform: 'Instagram',
+    completed: false
+  },
+  {
+    id: 'q-follow-ajecars-tiktok',
+    title: 'Follow Aje Cars on TikTok',
+    actionText: 'Visit @ajecarsnigeria on TikTok',
+    targetUrl: 'https://www.tiktok.com/@ajecarsnigeria',
+    points: 3,
+    rule: 'Self-declared with spot checks',
+    type: 'social_follow',
+    platform: 'TikTok',
     completed: false
   },
   {

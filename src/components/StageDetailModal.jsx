@@ -117,7 +117,7 @@ export const StageDetailModal = () => {
           {stage.number === 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <h4 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-light)' }}>
-                Signal Hunt · 7 channels, posts & warm-ups (Cap: 40 pts · Clear at 25)
+                Socials, posts & partner links (Cap: 58 pts · Clear at 25)
               </h4>
 
               {stage1Quests.map((quest) => {
