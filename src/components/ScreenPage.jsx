@@ -12,7 +12,12 @@ export const ScreenPage = () => {
   const previous = useRef({});
 
   useEffect(() => {
-    QRCode.toDataURL(window.location.origin, { width: 320, margin: 2 }).then(setJoinQr).catch(() => {});
+    QRCode.toDataURL(window.location.origin, {
+      width: 900,
+      margin: 4,
+      errorCorrectionLevel: 'H',
+      color: { dark: '#061009', light: '#FFFFFF' }
+    }).then(setJoinQr).catch(error => console.error('Could not create the Quest join QR.', error));
   }, []);
 
   useEffect(() => {
@@ -57,14 +62,11 @@ export const ScreenPage = () => {
           <h1>TechFest Quest</h1>
           <p>Jos TechFest 2026 · Live leaderboard</p>
         </div>
-        <div className="screen-join">
-          {joinQr && <img src={joinQr} alt="Join QR" />}
-          <span>Scan to join<br />{window.location.host}</span>
-        </div>
       </header>
 
       {error && <div className="screen-warn">Reconnecting…</div>}
 
+      <div className="screen-content">
       <ol className="screen-list">
         {top.length === 0 && !error && <li className="screen-empty">No players yet. Be the first to join!</li>}
         {top.map((player, index) => {
@@ -82,6 +84,17 @@ export const ScreenPage = () => {
           );
         })}
       </ol>
+      <aside className="screen-join" aria-label="Join TechFest Quest">
+        <div className="screen-join-copy">
+          <strong>JOIN THE QUEST</strong>
+          <span>Scan with your phone camera</span>
+        </div>
+        {joinQr
+          ? <img src={joinQr} alt={`Scan to join TechFest Quest at ${window.location.host}`} />
+          : <div className="screen-qr-loading">Preparing join code…</div>}
+        <span className="screen-join-url">{window.location.host}</span>
+      </aside>
+      </div>
     </div>
   );
 };

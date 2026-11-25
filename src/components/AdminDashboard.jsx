@@ -223,7 +223,7 @@ export const AdminDashboard = () => {
                 onClick={() => window.open('/screen', '_blank', 'noopener')}
               >
                 <QrCode size={14} />
-                <span>Projector View</span>
+                <span>Projector + Join QR</span>
               </button>
             </div>
           </div>

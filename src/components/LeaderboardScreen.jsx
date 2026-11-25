@@ -83,10 +83,10 @@ export const LeaderboardScreen = () => {
             fontWeight: '700',
             cursor: 'pointer'
           }}
-          title="Open Big-Screen Projector View for Sarau Arena"
+          title="Open projector view with large Quest join QR"
         >
           <Monitor size={14} />
-          <span>Venue Screen</span>
+          <span>Projector + Join QR</span>
         </button>
       </div>
 

@@ -26,6 +26,11 @@ export default async function handler(request, response) {
   }
 
   try {
+    const forwardedHost = request.headers['x-forwarded-host'] || request.headers.host || 'localhost';
+    const host = String(forwardedHost).split(',')[0].trim();
+    const forwardedProtocol = request.headers['x-forwarded-proto'] || (host.startsWith('localhost') ? 'http' : 'https');
+    const protocol = String(forwardedProtocol).split(',')[0].trim();
+    const appOrigin = new URL(`${protocol}://${host}`).origin;
     const sql = neon(QUEST_DATABASE_URL);
     const rows = await sql`
       SELECT email, full_name, attendee_type, organization, registration_type
@@ -45,7 +50,7 @@ export default async function handler(request, response) {
     const client = createClient({
       auth: {
         url: VITE_NEON_AUTH_URL,
-        fetchOptions: { headers: { Origin: 'https://techfest-fun.vercel.app' } }
+        fetchOptions: { headers: { Origin: appOrigin } }
       },
       dataApi: { url: VITE_NEON_DATA_API_URL }
     });
@@ -55,7 +60,7 @@ export default async function handler(request, response) {
         email: authEmail,
         password,
         options: {
-          emailRedirectTo: 'https://techfest-fun.vercel.app/',
+          emailRedirectTo: `${appOrigin}/`,
           data: { name: rows[0].full_name }
         }
       });
