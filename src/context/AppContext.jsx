@@ -156,6 +156,7 @@ export const AppProvider = ({ children }) => {
   const [staffQuizQuestions, setStaffQuizQuestions] = useState([]);
   const [stageSettings, setStageSettings] = useState({ 1: true, 2: true, 3: false, 4: false });
   const loadedUserRef = useRef(null);
+  const pendingSignupRef = useRef(null);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [offlineQueue, setOfflineQueue] = useState(readOfflineQueue);
   const [toastMessage, setToastMessage] = useState(null);
@@ -212,7 +213,7 @@ export const AppProvider = ({ children }) => {
       setBackendError('');
     }
     try {
-      const pending = readPendingSignup();
+      const pending = pendingSignupRef.current || readPendingSignup();
       const hasPending = (pending?.authEmail || pending?.email)?.toLowerCase() === authUser.email?.toLowerCase();
       // One parallel round trip. Staff-only views simply return nothing for normal attendees.
       const fetchAll = () => Promise.all([
@@ -240,7 +241,8 @@ export const AppProvider = ({ children }) => {
           p_registration_email: hasPending ? (pending.registrationEmail || pending.email || null) : null
         });
         if (profileError) throw profileError;
-        localStorage.removeItem(PENDING_SIGNUP_KEY);
+        pendingSignupRef.current = null;
+        try { localStorage.removeItem(PENDING_SIGNUP_KEY); } catch { /* storage is optional */ }
         results = await fetchAll();
       }
       const [profileResult, stateResult, ledgerResult, connectionsResult,
@@ -410,9 +412,11 @@ export const AppProvider = ({ children }) => {
     if (!session?.user) {
       loadedUserRef.current = null;
       if (!authLoading) {
-        Object.keys(localStorage)
-          .filter(key => key.startsWith(`${SNAPSHOT_KEY}:`))
-          .forEach(key => localStorage.removeItem(key));
+        try {
+          Object.keys(localStorage)
+            .filter(key => key.startsWith(`${SNAPSHOT_KEY}:`))
+            .forEach(key => localStorage.removeItem(key));
+        } catch { /* storage is optional */ }
       }
       setUser(null);
       setIsAdmin(false);
@@ -499,17 +503,34 @@ export const AppProvider = ({ children }) => {
       if (!response.ok) throw new Error(result?.error || 'Could not start your Quest session.');
       const authEmail = result.credentials?.email;
       if (!authEmail || !result.credentials?.password) throw new Error('Could not prepare your Quest account. Please try again.');
-      localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
+      const pendingSignup = {
         email: registration.email.toLowerCase(), authEmail,
         registrationEmail: registration.email.toLowerCase(), name: registration.full_name,
         role, attendeeType: registration.attendee_type || null,
         organization: registration.organization || null
-      }));
+      };
+      pendingSignupRef.current = pendingSignup;
+      try {
+        localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify(pendingSignup));
+      } catch (storageError) {
+        console.warn('Could not persist pending registration; continuing for this session.', storageError);
+      }
       const { data, error } = await supabase.auth.signInWithPassword(result.credentials);
       if (error) throw error;
-      if (data?.session) setSession(data.session);
+      let activeSession = data?.session;
+      if (!activeSession) {
+        const restored = await supabase.auth.getSession({ forceFetch: true });
+        if (restored.error) throw restored.error;
+        activeSession = restored.data?.session;
+      }
+      if (!activeSession) {
+        throw new Error('Quest could not confirm your sign-in session. Check your connection and try again.');
+      }
+      setSession(activeSession);
       return true;
     } catch (error) {
+      pendingSignupRef.current = null;
+      try { localStorage.removeItem(PENDING_SIGNUP_KEY); } catch { /* storage is optional */ }
       showError('Could not enter Quest', error);
       return false;
     }

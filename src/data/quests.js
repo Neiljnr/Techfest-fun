@@ -37,7 +37,7 @@ export const STAGES = [
     title: 'Prompt Blitz',
     subtitle: 'AI & Industry Quiz',
     tagline: '"Fast fingers, sharp minds."',
-    flavor: 'A high-stakes 10-question rapid quiz on AI, African tech, and Plateau innovation. 20s per question!',
+    flavor: 'A high-stakes 15-question rapid quiz on AI, African tech, and Plateau innovation. 20s per question!',
     color: '#FFD700', // Gold
     bgGlow: 'rgba(255, 215, 0, 0.15)',
     cap: 150,
