@@ -88,7 +88,7 @@ export const PlugScreen = () => {
     <div className="main-content">
       {/* Title */}
       <div>
-        <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Plug: Networking & QR</h2>
+        <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Connect with people</h2>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
           Show your QR or scan someone else's. You connect instantly and both earn points.
         </p>
@@ -112,7 +112,7 @@ export const PlugScreen = () => {
         </div>
 
         <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', maxWidth: '320px' }}>
-          Present this code to another builder or partner booth to plug into the network.
+          Show this code to another attendee or partner to connect and earn points together.
         </p>
 
         {/* High contrast QR box */}
@@ -157,7 +157,7 @@ export const PlugScreen = () => {
         <div>
           <h3 style={{ fontSize: '16px', fontWeight: '800' }}>Add social profiles (optional)</h3>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
-            Share the profiles you want other attendees to see in Plug and People.
+            Share the profiles you want other attendees to see in Connect and People.
           </p>
         </div>
         {SOCIAL_PLATFORMS.map(({ key, label, placeholder }) => (
@@ -233,7 +233,7 @@ export const PlugScreen = () => {
             borderRadius: '12px',
             fontSize: '13px'
           }}>
-            No connections yet. Scan an attendee QR in Sarau Hall to start plugging in!
+            No connections yet. Scan an attendee QR in Sarau Hall to connect!
           </div>
         ) : (
           connections.map(conn => (

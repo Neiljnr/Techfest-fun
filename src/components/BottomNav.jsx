@@ -38,14 +38,14 @@ export const BottomNav = () => {
         </button>
       </div>
 
-      {/* 4. Plug (Connections & Two-Way Handshake) */}
+      {/* 4. Connect (Networking & QR) */}
       <button 
         className={`nav-tab-item ${currentTab === 'plug' ? 'active' : ''}`}
         onClick={() => setCurrentTab('plug')}
         style={{ position: 'relative' }}
       >
         <UserCheck size={20} />
-        <span>Plug</span>
+        <span>Connect</span>
       </button>
 
       {/* 5. Board (Leaderboards & Hub Wars) */}
