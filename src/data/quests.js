@@ -9,8 +9,8 @@ export const STAGES = [
     subtitle: 'Socials & Warmup',
     tagline: '"Catch the signal. Rally your crew. Boot up."',
     flavor: 'Kick off the quest by finding TechFest and its community across seven social channels. Stack points, share the hype, and unlock the event floor.',
-    color: '#00E676', // TechFest Green
-    bgGlow: 'rgba(0, 230, 118, 0.15)',
+    color: '#18D64A', // TechFest Green
+    bgGlow: 'rgba(24, 214, 74, 0.15)',
     cap: 40,
     clearThreshold: 25,
     status: 'unlocked', // Always unlocked before event
@@ -23,8 +23,8 @@ export const STAGES = [
     subtitle: 'Human in the Loop',
     tagline: '"Humans in the loop."',
     flavor: 'Connect with builders across roles. Two-way QR handshake ensures real, meaningful networks.',
-    color: '#00B0FF', // Electric Blue
-    bgGlow: 'rgba(0, 176, 255, 0.15)',
+    color: '#FF9B22', // TechFest orange
+    bgGlow: 'rgba(255, 155, 34, 0.15)',
     cap: 200,
     clearThreshold: 5, // 5 confirmed connections
     clearType: 'connections',
@@ -38,8 +38,8 @@ export const STAGES = [
     subtitle: 'AI & Industry Quiz',
     tagline: '"Fast fingers, sharp minds."',
     flavor: 'A high-stakes 15-question rapid quiz on AI, African tech, and Plateau innovation. 20s per question!',
-    color: '#FFD700', // Gold
-    bgGlow: 'rgba(255, 215, 0, 0.15)',
+    color: '#B6FF59', // TechFest lime
+    bgGlow: 'rgba(182, 255, 89, 0.15)',
     cap: 150,
     clearThreshold: 5, // at least 5 correct answers
     clearType: 'correct_answers',
@@ -53,8 +53,8 @@ export const STAGES = [
     subtitle: 'Partner Automations',
     tagline: '"Plug into the people building the future."',
     flavor: 'Visit partner booths, scan active organizer-issued QRs, and complete server-scored challenges.',
-    color: '#FF4081', // Magenta / Neon Pink
-    bgGlow: 'rgba(255, 64, 129, 0.15)',
+    color: '#0A6A31', // Deep TechFest green
+    bgGlow: 'rgba(24, 214, 74, 0.15)',
     cap: 150,
     clearThreshold: 3, // 3 partners visited
     clearType: 'partners',

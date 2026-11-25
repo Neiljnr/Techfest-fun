@@ -12,16 +12,50 @@ import {
   Briefcase
 } from 'lucide-react';
 import QRCode from 'qrcode';
+import { SocialLinks } from './SocialLinks';
+import { cleanSocialLinks, normalizeSocialUrl, SOCIAL_PLATFORMS } from '../utils/socialLinks';
 
 export const PlugScreen = () => {
   const { 
     user, 
     connections, 
-    setActiveModal
+    setActiveModal,
+    updateProfile
   } = useApp();
 
   const [qrUrl, setQrUrl] = useState('');
   const [qrError, setQrError] = useState('');
+  const [socialValues, setSocialValues] = useState({
+    x: user.socialLinks?.x || '',
+    facebook: user.socialLinks?.facebook || '',
+    linkedin: user.socialLinks?.linkedin || ''
+  });
+  const [socialError, setSocialError] = useState('');
+  const [isSavingSocial, setIsSavingSocial] = useState(false);
+
+  useEffect(() => {
+    setSocialValues({
+      x: user.socialLinks?.x || '',
+      facebook: user.socialLinks?.facebook || '',
+      linkedin: user.socialLinks?.linkedin || ''
+    });
+  }, [user.socialLinks]);
+
+  const saveSocialLinks = async (event) => {
+    event.preventDefault();
+    const invalid = SOCIAL_PLATFORMS.find(({ key }) => socialValues[key].trim() && !normalizeSocialUrl(key, socialValues[key]));
+    if (invalid) {
+      setSocialError(`Enter a valid ${invalid.label} profile URL.`);
+      return;
+    }
+    setSocialError('');
+    setIsSavingSocial(true);
+    try {
+      await updateProfile({ socialLinks: cleanSocialLinks(socialValues) });
+    } finally {
+      setIsSavingSocial(false);
+    }
+  };
 
   // Generate attendee's own QR code
   useEffect(() => {
@@ -59,6 +93,35 @@ export const PlugScreen = () => {
           Show your QR or scan someone else's. You connect instantly and both earn points.
         </p>
       </div>
+
+      <form className="quest-card social-edit-card" onSubmit={saveSocialLinks}>
+        <div>
+          <h3 style={{ fontSize: '16px', fontWeight: '800' }}>Make a connection</h3>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
+            Add the profiles you want to share. Attendees will see them in Plug and People.
+          </p>
+        </div>
+        {SOCIAL_PLATFORMS.map(({ key, label, placeholder }) => (
+          <label className="social-input-row" key={key}>
+            <span className="social-input-label">{label}</span>
+            <input
+              className="social-input"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
+              placeholder={placeholder}
+              value={socialValues[key]}
+              onChange={event => setSocialValues(values => ({ ...values, [key]: event.target.value }))}
+              aria-label={`${label} profile URL`}
+            />
+          </label>
+        ))}
+        {socialError && <p role="alert" style={{ color: '#FFB16B', fontSize: '12px' }}>{socialError}</p>}
+        <button className="pill-btn-action pill-btn-primary" type="submit" disabled={isSavingSocial}>
+          {isSavingSocial ? 'Saving…' : 'Save social links'}
+        </button>
+        <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Sharing is optional. Leave a field blank to keep that profile private.</p>
+      </form>
 
       {/* Attendee badge */}
       <div 
@@ -123,8 +186,8 @@ export const PlugScreen = () => {
       <div 
         className="quest-card"
         style={{
-          background: 'rgba(0, 176, 255, 0.06)',
-          border: '1px solid rgba(0, 176, 255, 0.25)',
+          background: 'rgba(255, 155, 34, 0.06)',
+          border: '1px solid rgba(255, 155, 34, 0.25)',
           display: 'flex',
           flexDirection: 'column',
           gap: '10px'
@@ -132,12 +195,12 @@ export const PlugScreen = () => {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Briefcase size={18} color="#00B0FF" />
+            <Briefcase size={18} color="var(--orange-accent)" />
             <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#FFF' }}>
               Founder Roundtable
             </h4>
           </div>
-          <span style={{ fontSize: '11px', fontWeight: '800', color: '#00B0FF' }}>
+          <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--orange-accent)' }}>
             Verified check-in
           </span>
         </div>
@@ -194,6 +257,7 @@ export const PlugScreen = () => {
                   {conn.role.toUpperCase()} Â· Confirmed at {conn.confirmedAt}
                   {conn.role !== user.role && ' Â· Cross-role'}
                 </div>
+                <SocialLinks links={conn.socialLinks} name={conn.name} />
               </div>
 
               <span style={{

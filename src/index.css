@@ -5,23 +5,25 @@
 
 :root {
   /* Brand Colors: Green, White, Touch of Black */
-  --bg-core: #090D0B;
-  --bg-card: rgba(18, 26, 21, 0.75);
-  --bg-card-hover: rgba(26, 38, 30, 0.85);
-  --bg-surface: #121814;
-  --bg-surface-elevated: #18221B;
+  --bg-core: #04190D;
+  --bg-card: rgba(8, 39, 19, 0.88);
+  --bg-card-hover: rgba(12, 54, 26, 0.94);
+  --bg-surface: #082311;
+  --bg-surface-elevated: #0D2D17;
 
   /* Jos TechFest Green Accents */
-  --green-primary: #00E676;
-  --green-glow: rgba(0, 230, 118, 0.25);
-  --green-subtle: rgba(0, 230, 118, 0.12);
-  --green-dark: #008744;
+  --green-primary: #18D64A;
+  --green-glow: rgba(24, 214, 74, 0.24);
+  --green-subtle: rgba(24, 214, 74, 0.12);
+  --green-dark: #075528;
+  --lime-accent: #B6FF59;
+  --orange-accent: #FF9B22;
 
   /* Stage Accent Colors */
   --accent-boot: #00E676;      /* Stage 1: Boot Up (Green) */
-  --accent-plug: #00B0FF;      /* Stage 2: Plug In (Electric Blue) */
-  --accent-blitz: #FFD700;     /* Stage 3: Prompt Blitz (Gold) */
-  --accent-partner: #FF4081;   /* Stage 4: Partners (Neon Pink) */
+  --accent-plug: #FF9B22;      /* Stage 2: Plug In (TechFest orange) */
+  --accent-blitz: #B6FF59;     /* Stage 3: Prompt Blitz (lime) */
+  --accent-partner: #18D64A;   /* Stage 4: Partners (TechFest green) */
   --accent-student: #7C4DFF;   /* Purple */
 
   /* Text & Contrast */
@@ -32,7 +34,7 @@
 
   /* Borders & Glass */
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-green: rgba(0, 230, 118, 0.35);
+  --border-green: rgba(24, 214, 74, 0.35);
   --glass-blur: blur(16px);
 
   /* Typography */
@@ -150,7 +152,7 @@ body::before {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(9, 13, 11, 0.85);
+  background: rgba(4, 25, 13, 0.94);
   backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
@@ -334,6 +336,71 @@ h1, h2, h3, h4, h5 {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 88% 20%, rgba(24, 214, 74, 0.22), transparent 38%),
+    linear-gradient(135deg, rgba(8, 47, 21, 0.98), rgba(4, 25, 13, 0.96));
+  border-color: rgba(24, 214, 74, 0.28);
+}
+
+.welcome-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: repeating-linear-gradient(115deg, #18D64A 0 14px, #B6FF59 14px 20px, #FF9B22 20px 28px, transparent 28px 38px);
+  opacity: 0.9;
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 5px 0 1px;
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: #04190D;
+  font-family: var(--font-heading);
+  font-weight: 900;
+  font-size: 20px;
+  background: linear-gradient(145deg, var(--lime-accent), var(--green-primary) 60%, #079C38);
+  box-shadow: 0 0 22px rgba(24, 214, 74, 0.24);
+}
+
+.brand-name {
+  color: #fff;
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  line-height: 1.15;
+}
+
+.brand-year {
+  color: var(--lime-accent);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  margin-top: 3px;
+}
+
+.brand-tagline {
+  display: block;
+  color: var(--lime-accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 4px;
 }
 
 .welcome-badge-row {
@@ -346,7 +413,7 @@ h1, h2, h3, h4, h5 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(0, 230, 118, 0.1);
+  background: rgba(24, 214, 74, 0.12);
   color: var(--green-primary);
   font-size: 11px;
   font-weight: 700;
@@ -354,7 +421,7 @@ h1, h2, h3, h4, h5 {
   letter-spacing: 0.8px;
   padding: 4px 10px;
   border-radius: 20px;
-  border: 1px solid rgba(0, 230, 118, 0.25);
+  border: 1px solid rgba(24, 214, 74, 0.3);
 }
 
 .rank-link-badge {
@@ -975,6 +1042,66 @@ input, select, textarea {
 .modal-sheet {
   max-height: 92dvh;
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+.social-edit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-color: rgba(24, 214, 74, 0.26);
+}
+
+.social-input-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.social-input-label {
+  color: var(--text-light);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.social-input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 12px;
+  color: var(--text-white);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.social-input:focus {
+  border-color: var(--green-primary);
+}
+
+.social-links-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.social-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid rgba(24, 214, 74, 0.24);
+  border-radius: 999px;
+  color: var(--lime-accent);
+  background: rgba(24, 214, 74, 0.08);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.social-link-chip:hover {
+  background: rgba(24, 214, 74, 0.17);
 }
 
 .modal-body {

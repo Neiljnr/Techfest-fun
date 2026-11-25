@@ -109,6 +109,14 @@ export const HomeScreen = () => {
         </div>
 
         <div>
+          <div className="brand-lockup" aria-label="Jos TechFest 2026">
+            <div className="brand-mark" aria-hidden="true">J</div>
+            <div>
+              <div className="brand-name">JOS TechFest</div>
+              <div className="brand-year">&lt;/2026&gt; · JOS, NIGERIA</div>
+            </div>
+          </div>
+          <span className="brand-tagline">AI for every sector · From innovation to implementation</span>
           <h2 className="welcome-title">Automate the Day</h2>
           <p className="welcome-subtitle">
             Sarau Event Center, Jos · 26 November 2026 · One-day event. Complete quests, plug into builders, and rule the board.

@@ -59,6 +59,7 @@ const mapProfile = (profile, authUser) => ({
   city: 'Jos',
   bio: profile.bio,
   company: profile.company,
+  socialLinks: profile.social_links || {},
   qrToken: profile.qr_token,
   isCheckedIn: false,
   isOnboarded: true,
@@ -91,6 +92,7 @@ const mapConnection = (row, userId, userRole, ownLedger) => {
     name: isRequester ? row.recipient_name : row.requester_name,
     role: isRequester ? row.recipient_role : row.requester_role,
     avatarId: isRequester ? row.recipient_avatar_id : row.requester_avatar_id,
+    socialLinks: (isRequester ? row.recipient_social_links : row.requester_social_links) || {},
     status: row.status,
     isDifferentRole: (isRequester ? row.recipient_role : row.requester_role) !== userRole,
     pointsAwarded: awardedEntry?.points || 0,
@@ -284,6 +286,7 @@ export const AppProvider = ({ children }) => {
         hubId: row.hub_id,
         bio: row.bio,
         company: row.company,
+        socialLinks: row.social_links || {},
         title: row.company || row.role
       }));
       const drops = catalogResult.data
@@ -571,6 +574,7 @@ export const AppProvider = ({ children }) => {
       hub_id: updates.hubId,
       bio: updates.bio ?? user.bio,
       company: updates.company ?? user.company,
+      social_links: updates.socialLinks ?? user.socialLinks ?? {},
       hide_from_public_board: updates.hideFromPublicBoard ?? user.hideFromPublicBoard
     }).eq('id', user.id);
     if (error) {

@@ -11,6 +11,7 @@ import {
   Users,
   Building
 } from 'lucide-react';
+import { SocialLinks } from './SocialLinks';
 
 export const PeopleScreen = () => {
   const { user, attendees, connections } = useApp();
@@ -181,6 +182,8 @@ export const PeopleScreen = () => {
                 <p style={{ fontSize: '12.5px', color: 'var(--text-light)', lineHeight: 1.4 }}>
                   {att.bio}
                 </p>
+
+                <SocialLinks links={att.socialLinks} name={att.name} />
 
                 {/* Connect action */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '8px' }}>
