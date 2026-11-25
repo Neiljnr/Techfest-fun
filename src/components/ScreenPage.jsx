@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { getRoleMeta, getAvatarMeta } from '../data/avatars';
 
 const POLL_MS = 3000;
+const JOIN_URL = 'https://quest.techfest.com.ng';
 
 export const ScreenPage = () => {
   const [players, setPlayers] = useState([]);
@@ -12,7 +13,7 @@ export const ScreenPage = () => {
   const previous = useRef({});
 
   useEffect(() => {
-    QRCode.toDataURL(window.location.origin, {
+    QRCode.toDataURL(JOIN_URL, {
       width: 900,
       margin: 4,
       errorCorrectionLevel: 'H',
@@ -90,9 +91,9 @@ export const ScreenPage = () => {
           <span>Scan with your phone camera</span>
         </div>
         {joinQr
-          ? <img src={joinQr} alt={`Scan to join TechFest Quest at ${window.location.host}`} />
+          ? <img src={joinQr} alt={`Scan to join TechFest Quest at ${new URL(JOIN_URL).host}`} />
           : <div className="screen-qr-loading">Preparing join code…</div>}
-        <span className="screen-join-url">{window.location.host}</span>
+        <span className="screen-join-url">{new URL(JOIN_URL).host}</span>
       </aside>
       </div>
     </div>

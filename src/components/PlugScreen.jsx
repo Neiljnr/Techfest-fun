@@ -94,35 +94,6 @@ export const PlugScreen = () => {
         </p>
       </div>
 
-      <form className="quest-card social-edit-card" onSubmit={saveSocialLinks}>
-        <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '800' }}>Make a connection</h3>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
-            Add the profiles you want to share. Attendees will see them in Plug and People.
-          </p>
-        </div>
-        {SOCIAL_PLATFORMS.map(({ key, label, placeholder }) => (
-          <label className="social-input-row" key={key}>
-            <span className="social-input-label">{label}</span>
-            <input
-              className="social-input"
-              type="url"
-              inputMode="url"
-              autoComplete="url"
-              placeholder={placeholder}
-              value={socialValues[key]}
-              onChange={event => setSocialValues(values => ({ ...values, [key]: event.target.value }))}
-              aria-label={`${label} profile URL`}
-            />
-          </label>
-        ))}
-        {socialError && <p role="alert" style={{ color: '#FFB16B', fontSize: '12px' }}>{socialError}</p>}
-        <button className="pill-btn-action pill-btn-primary" type="submit" disabled={isSavingSocial}>
-          {isSavingSocial ? 'Saving…' : 'Save social links'}
-        </button>
-        <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Sharing is optional. Leave a field blank to keep that profile private.</p>
-      </form>
-
       {/* Attendee badge */}
       <div 
         className="quest-card" 
@@ -181,6 +152,35 @@ export const PlugScreen = () => {
           </span>
         </div>
       </div>
+
+      <form className="quest-card social-edit-card" onSubmit={saveSocialLinks}>
+        <div>
+          <h3 style={{ fontSize: '16px', fontWeight: '800' }}>Add social profiles (optional)</h3>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
+            Share the profiles you want other attendees to see in Plug and People.
+          </p>
+        </div>
+        {SOCIAL_PLATFORMS.map(({ key, label, placeholder }) => (
+          <label className="social-input-row" key={key}>
+            <span className="social-input-label">{label}</span>
+            <input
+              className="social-input"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
+              placeholder={placeholder}
+              value={socialValues[key]}
+              onChange={event => setSocialValues(values => ({ ...values, [key]: event.target.value }))}
+              aria-label={`${label} profile URL`}
+            />
+          </label>
+        ))}
+        {socialError && <p role="alert" style={{ color: '#FFB16B', fontSize: '12px' }}>{socialError}</p>}
+        <button className="pill-btn-action pill-btn-primary" type="submit" disabled={isSavingSocial}>
+          {isSavingSocial ? 'Saving…' : 'Save social links'}
+        </button>
+        <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Leave a field blank to keep that profile private.</p>
+      </form>
 
       {/* Organizer-issued event attendance */}
       <div 

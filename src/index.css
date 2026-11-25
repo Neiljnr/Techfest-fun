@@ -1309,12 +1309,12 @@ button {
 .screen-head { display: flex; justify-content: space-between; align-items: center; gap: 3vmin; }
 .screen-head h1 { font-size: clamp(28px, 5vmin, 72px); font-weight: 900; color: var(--green-primary); line-height: 1.1; }
 .screen-head p { font-size: clamp(14px, 2.2vmin, 28px); color: var(--text-muted); }
-.screen-join { display: grid; justify-items: center; gap: 1vmin; min-width: clamp(230px, 33vmin, 420px); padding: 1.4vmin; border: 2px solid rgba(0,230,118,0.32); border-radius: 22px; background: linear-gradient(145deg, rgba(0,230,118,0.12), rgba(255,255,255,0.04)); box-shadow: 0 12px 48px rgba(0,0,0,0.32); text-align: center; color: #fff; }
+.screen-join { display: grid; justify-items: center; gap: 1.2vmin; min-width: clamp(360px, 56vmin, 620px); padding: 2vmin; border: 2px solid rgba(0,230,118,0.32); border-radius: 22px; background: linear-gradient(145deg, rgba(0,230,118,0.12), rgba(255,255,255,0.04)); box-shadow: 0 12px 48px rgba(0,0,0,0.32); text-align: center; color: #fff; }
 .screen-join-copy { display: grid; gap: 0.25vmin; }
 .screen-join-copy strong { font-size: clamp(17px, 2.1vmin, 28px); font-weight: 900; letter-spacing: 0.1em; color: var(--green-primary); }
 .screen-join-copy span { font-size: clamp(12px, 1.4vmin, 19px); color: #D1D9D4; }
-.screen-join img { display: block; width: clamp(190px, 29vmin, 370px); aspect-ratio: 1; padding: 8px; box-sizing: border-box; border-radius: 16px; background: #fff; }
-.screen-qr-loading { width: clamp(190px, 29vmin, 370px); aspect-ratio: 1; display: grid; place-items: center; border-radius: 16px; background: #fff; color: #07130D; font-size: 18px; font-weight: 700; }
+.screen-join img { display: block; width: clamp(320px, 52vmin, 560px); aspect-ratio: 1; padding: 10px; box-sizing: border-box; border-radius: 18px; background: #fff; }
+.screen-qr-loading { width: clamp(320px, 52vmin, 560px); aspect-ratio: 1; display: grid; place-items: center; border-radius: 18px; background: #fff; color: #07130D; font-size: 18px; font-weight: 700; }
 .screen-join-url { font-size: clamp(13px, 1.6vmin, 21px); font-weight: 800; color: #fff; letter-spacing: 0.02em; }
 .screen-content { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 3vmin; flex: 1; min-height: 0; }
 .screen-warn { color: #FFD700; font-size: clamp(14px, 2vmin, 24px); }
