@@ -1,4 +1,4 @@
-import { handleAuthProxyRequest } from '@neon/auth/server';
+import { handleAuthRequest, handleAuthResponse } from '@neon/auth/server';
 
 const AUTH_PATH_PREFIX = '/api/neon-auth/';
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
@@ -49,11 +49,13 @@ export default async function handler(request, response) {
       ...(body === undefined ? {} : { body })
     });
 
-    const proxied = await handleAuthProxyRequest({
-      request: proxyRequest,
-      path,
-      baseUrl: authUrl.replace(/\/+$/, ''),
-      cookieSecret,
+    const authBaseUrl = authUrl.replace(/\/+$/, '');
+    // Forward get-session directly. The proxy's session-cache shortcut can
+    // return a cached session without Neon Auth's set-auth-jwt header, leaving
+    // the client with the opaque cookie token for Data API requests.
+    const upstream = await handleAuthRequest(authBaseUrl, proxyRequest, path);
+    const proxied = await handleAuthResponse(upstream, authBaseUrl, {
+      secret: cookieSecret,
       sameSite: 'lax'
     });
 
