@@ -568,15 +568,24 @@ export const AppProvider = ({ children }) => {
 
   const updateProfile = async (updates) => {
     if (!user) return false;
-    const { error } = await supabase.from('profiles').update({
-      name: updates.name,
-      avatar_id: updates.avatarId,
-      hub_id: updates.hubId,
-      bio: updates.bio ?? user.bio,
-      company: updates.company ?? user.company,
-      social_links: updates.socialLinks ?? user.socialLinks ?? {},
-      hide_from_public_board: updates.hideFromPublicBoard ?? user.hideFromPublicBoard
-    }).eq('id', user.id);
+    const profileUpdates = {};
+    const editableFields = {
+      name: 'name',
+      avatarId: 'avatar_id',
+      hubId: 'hub_id',
+      bio: 'bio',
+      company: 'company',
+      socialLinks: 'social_links',
+      hideFromPublicBoard: 'hide_from_public_board'
+    };
+    Object.entries(editableFields).forEach(([inputKey, column]) => {
+      if (Object.prototype.hasOwnProperty.call(updates, inputKey)) {
+        profileUpdates[column] = updates[inputKey];
+      }
+    });
+    if (Object.keys(profileUpdates).length === 0) return false;
+
+    const { error } = await supabase.from('profiles').update(profileUpdates).eq('id', user.id);
     if (error) {
       showError('Profile could not be saved', error);
       return false;
