@@ -20,9 +20,6 @@ export default async function handler(request, response) {
   }
 
   const authUrl = process.env.VITE_NEON_AUTH_URL?.trim();
-  // Reuse the existing high-entropy server secret so no additional Vercel
-  // environment variable is required. A dedicated NEON_AUTH_COOKIE_SECRET can
-  // override it later without changing the app.
   const cookieSecret = process.env.NEON_AUTH_COOKIE_SECRET || process.env.QUEST_GUEST_AUTH_SECRET;
   if (!authUrl || !cookieSecret || cookieSecret.length < 32) {
     response.status(503).json({ error: 'Quest sign-in is not configured.' });
@@ -31,16 +28,15 @@ export default async function handler(request, response) {
 
   try {
     const requestUrl = new URL(request.url, `https://${request.headers.host || 'localhost'}`);
-    if (!requestUrl.pathname.startsWith(AUTH_PATH_PREFIX)) {
-      response.status(404).json({ error: 'Auth endpoint not found.' });
-      return;
-    }
-    const path = requestUrl.pathname.slice(AUTH_PATH_PREFIX.length);
+    const rawPath = requestUrl.searchParams.get('path') || '';
+    const path = rawPath.replace(/^\/+|\/+$/g, '');
     if (!path || !/^[A-Za-z0-9/_-]+$/.test(path)) {
       response.status(400).json({ error: 'Invalid auth path.' });
       return;
     }
 
+    requestUrl.pathname = `${AUTH_PATH_PREFIX}${path}`;
+    requestUrl.searchParams.delete('path');
     const headers = new Headers();
     for (const [name, value] of Object.entries(request.headers || {})) {
       if (typeof value === 'string') headers.set(name, value);
@@ -62,8 +58,6 @@ export default async function handler(request, response) {
     });
 
     proxied.headers.forEach((value, name) => {
-      // fetch() transparently decodes compressed upstream bodies, so do not
-      // forward the upstream encoding/length metadata with the decoded bytes.
       if (!['set-cookie', 'content-encoding', 'content-length'].includes(name.toLowerCase())) {
         response.setHeader(name, value);
       }

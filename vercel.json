@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/api/neon-auth/:path*", "destination": "/api/neon-auth-proxy?path=:path*" },
     { "source": "/((?!api/).*)", "destination": "/" }
   ]
 }
