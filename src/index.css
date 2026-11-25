@@ -456,6 +456,80 @@ h1, h2, h3, h4, h5 {
   font-size: 13.5px;
 }
 
+/* Partner strip uses the supplied TechFest sponsor artwork. */
+.sponsor-marquee {
+  padding: 10px 0 9px;
+  border: 1px solid rgba(24, 214, 74, 0.24);
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(110deg, rgba(8, 35, 17, 0.96), rgba(5, 18, 10, 0.96));
+  box-shadow: inset 0 0 24px rgba(24, 214, 74, 0.04);
+}
+
+.sponsor-marquee-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 12px 8px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.05px;
+  text-transform: uppercase;
+}
+
+.sponsor-marquee-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--lime-accent);
+  letter-spacing: 0.55px;
+}
+
+.sponsor-marquee-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green-primary);
+  box-shadow: 0 0 10px var(--green-primary);
+}
+
+.sponsor-marquee-window {
+  overflow: hidden;
+  width: 100%;
+  mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+}
+
+.sponsor-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: sponsor-marquee-scroll 48s linear infinite;
+  will-change: transform;
+}
+
+.sponsor-marquee-track img {
+  display: block;
+  width: auto;
+  height: 124px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  background: #fff;
+}
+
+.sponsor-marquee:hover .sponsor-marquee-track,
+.sponsor-marquee:focus-within .sponsor-marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes sponsor-marquee-scroll {
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sponsor-marquee-track { animation: none; }
+  .sponsor-marquee-window { overflow-x: auto; }
+}
+
 /* Stage Node Tracker (The 4 Stages) */
 .stage-tracker-card {
   padding: 16px;

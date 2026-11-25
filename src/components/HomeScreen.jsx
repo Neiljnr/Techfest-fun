@@ -1,6 +1,7 @@
 import { useApp } from '../context/AppContext';
 import { STAGES } from '../data/quests';
 import { getTitleForPoints } from '../data/ranks';
+import { SponsorMarquee } from './SponsorMarquee';
 import { 
   Zap, 
   Users, 
@@ -89,6 +90,7 @@ export const HomeScreen = () => {
 
   return (
     <div className="main-content">
+      <SponsorMarquee />
       {/* 1. Welcome Card (H2) */}
       <div className="quest-card card-highlight welcome-card">
         <div className="welcome-badge-row">
