@@ -1,24 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { COMMUNITY_HUBS } from '../data/hubs';
 import { getAvatarMeta } from '../data/avatars';
 import { getTitleForPoints } from '../data/ranks';
-import { 
-  Trophy, 
-  Crown, 
-  Medal, 
-  Search, 
-  Monitor, 
-  Users, 
-  Briefcase, 
-  Flame, 
-  Sparkles 
-} from 'lucide-react';
+import { Crown, Search, Monitor } from 'lucide-react';
 
 export const LeaderboardScreen = () => {
-  const { user, points, setCurrentTab, leaderboard } = useApp();
-  const [activeBoardTab, setActiveBoardTab] = useState('main'); // 'main', 'founder', 'hubs'
+  const { user, points, setCurrentTab, leaderboard, isAdmin } = useApp();
   const [searchFilter, setSearchFilter] = useState('');
+  const [banterIndex, setBanterIndex] = useState(0);
+  const [rankMoves, setRankMoves] = useState({});
+  const previousRanksRef = useRef(null);
+  const rankMoveTimerRef = useRef(null);
 
   const ownBoardEntry = {
     id: user.id,
@@ -29,32 +21,50 @@ export const LeaderboardScreen = () => {
     avatarId: user.avatarId,
     hubId: user.hubId
   };
-  const boardWithCurrentUser = leaderboard.some(player => player.id === user.id)
+  const boardWithCurrentUser = isAdmin || leaderboard.some(player => player.id === user.id)
     ? leaderboard
     : [...leaderboard, ownBoardEntry];
   const mainBoardList = [...boardWithCurrentUser]
     .sort((a, b) => b.points - a.points)
     .filter(p => p.name.toLowerCase().includes(searchFilter.toLowerCase()));
 
-  const founderBoardList = boardWithCurrentUser.filter(attendee => attendee.role === 'founder')
-    .sort((a, b) => b.points - a.points);
-
-  const hubsList = COMMUNITY_HUBS
-    .map(hub => {
-      const membersInHub = boardWithCurrentUser.filter(attendee => attendee.hubId === hub.id);
-      const total = membersInHub.reduce((sum, attendee) => sum + attendee.points, 0);
-      const members = membersInHub.length;
-      return {
-        ...hub,
-        calculatedScore: members ? Math.round(total / members) : 0,
-        totalPoints: total,
-        members
-      };
-    })
-    .filter(hub => hub.members > 0)
-    .sort((a, b) => b.calculatedScore - a.calculatedScore);
-
   const top3 = mainBoardList.slice(0, 3);
+  const overallRank = [...boardWithCurrentUser].sort((a, b) => b.points - a.points)
+    .findIndex(player => player.id === user.id) + 1;
+  const banterLines = isAdmin
+    ? ['Players, the crown is up for grabs. Who go collect am? 👑', 'One good quiz fit scatter this whole board 🤯⚡', 'Current leader, enjoy am while e last 😂']
+    : overallRank === 1
+      ? ['You see this top? Na here I go dey 😎👑', 'Top spot secured… for now. Who wan try? 😂', 'Oga at the top, no blink o 👀']
+      : overallRank === 2
+        ? ['I dey come for that top spot. Hold am well 😤🚀', 'Second place na temporary arrangement 😅', 'One quiz and I don collect that crown 🤭👑']
+        : ['Small small, I dey climb. Make una watch 👀📈', 'No panic, comeback dey load… 🔥', 'I’m taking the top spot one point at a time 🏃🏽‍♂️💨', 'This board no be family property; we fit collect am 😂'];
+
+  useEffect(() => {
+    setBanterIndex(0);
+    const timer = window.setInterval(() => setBanterIndex(index => (index + 1) % banterLines.length), 7000);
+    return () => window.clearInterval(timer);
+  }, [overallRank, banterLines.length]);
+
+  useEffect(() => {
+    const rankedPlayers = [...boardWithCurrentUser].sort((a, b) => b.points - a.points);
+    const currentRanks = new Map(rankedPlayers.map((player, index) => [player.id, index + 1]));
+    const previousRanks = previousRanksRef.current;
+    window.clearTimeout(rankMoveTimerRef.current);
+
+    if (previousRanks) {
+      const moves = {};
+      currentRanks.forEach((rank, playerId) => {
+        const previousRank = previousRanks.get(playerId);
+        if (previousRank && previousRank !== rank) moves[playerId] = previousRank - rank;
+      });
+      setRankMoves(moves);
+      if (Object.keys(moves).length) {
+        rankMoveTimerRef.current = window.setTimeout(() => setRankMoves({}), 7000);
+      }
+    }
+
+    previousRanksRef.current = currentRanks;
+  }, [leaderboard, points, user.id, isAdmin]);
 
   return (
     <div className="main-content">
@@ -90,65 +100,35 @@ export const LeaderboardScreen = () => {
         </button>
       </div>
 
-      {/* Tabs */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 1fr',
-        background: 'rgba(255, 255, 255, 0.04)',
-        padding: '4px',
+        padding: '8px 12px',
         borderRadius: '12px',
-        border: '1px solid var(--border-subtle)'
+        background: 'rgba(24, 214, 74, 0.12)',
+        color: 'var(--green-primary)',
+        fontSize: '13px',
+        fontWeight: '800',
+        textAlign: 'center'
       }}>
-        <button
-          onClick={() => setActiveBoardTab('main')}
-          style={{
-            padding: '8px 4px',
-            borderRadius: '8px',
-            border: 'none',
-            fontSize: '12.5px',
-            fontWeight: '700',
-            cursor: 'pointer',
-            background: activeBoardTab === 'main' ? 'var(--green-primary)' : 'transparent',
-            color: activeBoardTab === 'main' ? '#090D0B' : 'var(--text-muted)'
-          }}
-        >
-          Main Board
-        </button>
-        <button
-          onClick={() => setActiveBoardTab('founder')}
-          style={{
-            padding: '8px 4px',
-            borderRadius: '8px',
-            border: 'none',
-            fontSize: '12.5px',
-            fontWeight: '700',
-            cursor: 'pointer',
-            background: activeBoardTab === 'founder' ? '#00B0FF' : 'transparent',
-            color: activeBoardTab === 'founder' ? '#090D0B' : 'var(--text-muted)'
-          }}
-        >
-          Founder Track
-        </button>
-        <button
-          onClick={() => setActiveBoardTab('hubs')}
-          style={{
-            padding: '8px 4px',
-            borderRadius: '8px',
-            border: 'none',
-            fontSize: '12.5px',
-            fontWeight: '700',
-            cursor: 'pointer',
-            background: activeBoardTab === 'hubs' ? '#FFD700' : 'transparent',
-            color: activeBoardTab === 'hubs' ? '#090D0B' : 'var(--text-muted)'
-          }}
-        >
-          Hub Wars
-        </button>
+        🏆 Main Board
       </div>
 
       {/* MAIN BOARD CONTENT */}
-      {activeBoardTab === 'main' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div aria-live="polite" style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '9px',
+            padding: '11px 13px',
+            borderRadius: '12px',
+            background: 'rgba(24, 214, 74, 0.08)',
+            border: '1px solid rgba(24, 214, 74, 0.2)',
+            color: 'var(--text-light)',
+            fontSize: '12.5px',
+            fontWeight: '650'
+          }}>
+            <span aria-hidden="true" style={{ fontSize: '16px' }}>💬</span>
+            <span>{banterLines[banterIndex]}</span>
+          </div>
           {/* Top 3 Podium */}
           {top3.length >= 3 && !searchFilter && (
             <div style={{
@@ -273,6 +253,20 @@ export const LeaderboardScreen = () => {
                     <span className={`rank-badge-num rank-${rank <= 3 ? rank : 'other'}`}>
                       {rank}
                     </span>
+                    {rankMoves[player.id] && (
+                      <span
+                        aria-label={rankMoves[player.id] > 0 ? `Moved up ${rankMoves[player.id]} places` : `Moved down ${Math.abs(rankMoves[player.id])} places`}
+                        title={rankMoves[player.id] > 0 ? `Up ${rankMoves[player.id]} places` : `Down ${Math.abs(rankMoves[player.id])} places`}
+                        style={{
+                          color: rankMoves[player.id] > 0 ? 'var(--green-primary)' : '#FF8A80',
+                          fontSize: '10px',
+                          fontWeight: '800',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {rankMoves[player.id] > 0 ? `▲${rankMoves[player.id]}` : `▼${Math.abs(rankMoves[player.id])}`}
+                      </span>
+                    )}
                     <div 
                       className="avatar-thumbnail"
                       style={{ width: '34px', height: '34px' }}
@@ -301,114 +295,6 @@ export const LeaderboardScreen = () => {
             })}
           </div>
         </div>
-      )}
-
-      {/* FOUNDER TRACK BOARD */}
-      {activeBoardTab === 'founder' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{
-            background: 'rgba(0, 176, 255, 0.08)',
-            border: '1px solid rgba(0, 176, 255, 0.25)',
-            borderRadius: '12px',
-            padding: '12px',
-            fontSize: '12.5px',
-            color: 'var(--text-light)'
-          }}>
-            🚀 <strong>Founder Track</strong> rewards executive roundtable engagement, open demos, and warm introductions (Cap: 200 pts).
-          </div>
-
-          {founderBoardList.map((f, idx) => (
-            <div
-              key={f.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 14px',
-                borderRadius: '12px',
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid var(--border-subtle)'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span className={`rank-badge-num rank-${idx < 3 ? idx + 1 : 'other'}`}>
-                  {idx + 1}
-                </span>
-                <div>
-                  <span style={{ fontSize: '14px', fontWeight: '700', color: '#FFF' }}>
-                    {f.name}
-                  </span>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    {f.role} · {f.points} verified event points
-                  </div>
-                </div>
-              </div>
-
-              <span style={{ fontSize: '15px', fontWeight: '800', color: '#00B0FF' }}>
-                {f.points} pts
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* HUB WARS BOARD (Normalized Team Scores) */}
-      {activeBoardTab === 'hubs' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{
-            background: 'rgba(255, 215, 0, 0.08)',
-            border: '1px solid rgba(255, 215, 0, 0.25)',
-            borderRadius: '12px',
-            padding: '12px',
-            fontSize: '12.5px',
-            color: 'var(--text-light)'
-          }}>
-            🛡️ <strong>Hub Wars</strong> calculates average score per active member (Total Points ÷ Members) so any size community hub competes on fair footing!
-          </div>
-
-          {hubsList.map((hub, idx) => {
-            const isUserHub = user.hubId === hub.id;
-
-            return (
-              <div
-                key={hub.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px',
-                  borderRadius: '12px',
-                  background: isUserHub ? 'rgba(255, 215, 0, 0.1)' : 'rgba(255, 255, 255, 0.03)',
-                  border: isUserHub ? '1.5px solid #FFD700' : '1px solid var(--border-subtle)'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span className={`rank-badge-num rank-${idx < 3 ? idx + 1 : 'other'}`}>
-                    {idx + 1}
-                  </span>
-                  <div>
-                    <span style={{ fontSize: '14.5px', fontWeight: '800', color: isUserHub ? '#FFD700' : '#FFF' }}>
-                      {hub.name} {isUserHub && '(Your Hub)'}
-                    </span>
-                    <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                      {hub.location} · {hub.members} active members
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '16px', fontWeight: '800', color: hub.color }}>
-                    {hub.calculatedScore}
-                  </div>
-                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-                    pts / member
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 };

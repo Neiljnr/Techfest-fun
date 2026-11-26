@@ -1,15 +1,13 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
-  QrCode, 
   UserCheck, 
   Clock, 
   Check, 
   X, 
   Sparkles, 
   ShieldCheck, 
-  Users,
-  Briefcase
+  Users
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { SocialLinks } from './SocialLinks';
@@ -19,7 +17,6 @@ export const PlugScreen = () => {
   const { 
     user, 
     connections, 
-    setActiveModal,
     updateProfile
   } = useApp();
 
@@ -181,42 +178,6 @@ export const PlugScreen = () => {
         </button>
         <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Leave a field blank to keep that profile private.</p>
       </form>
-
-      {/* Organizer-issued event attendance */}
-      <div 
-        className="quest-card"
-        style={{
-          background: 'rgba(255, 155, 34, 0.06)',
-          border: '1px solid rgba(255, 155, 34, 0.25)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Briefcase size={18} color="var(--orange-accent)" />
-            <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#FFF' }}>
-              Founder Roundtable
-            </h4>
-          </div>
-          <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--orange-accent)' }}>
-            Verified check-in
-          </span>
-        </div>
-
-        <p style={{ fontSize: '12px', color: 'var(--text-light)' }}>
-          Exclusive executive track for CEOs, CTOs and founders at Sarau VIP lounge.
-        </p>
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          Scan the active organizer-issued QR at the roundtable. Points are recorded once by the event server.
-        </p>
-
-        <button className="pill-btn-action pill-btn-primary" onClick={() => setActiveModal('scanner')}>
-          <QrCode size={16} />
-          <span>Scan event check-in QR</span>
-        </button>
-      </div>
 
       {/* 4. Confirmed Connections List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
