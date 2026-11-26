@@ -26,6 +26,8 @@ export const AdminDashboard = () => {
     staffEventCodes,
     createEventCode,
     leaderboard,
+    staffCheckinCount,
+    setActiveModal,
     setCurrentTab,
     showToast
   } = useApp();
@@ -165,6 +167,16 @@ export const AdminDashboard = () => {
           }}>
             <div className="quest-card" style={{ padding: '14px' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                Attendees checked in
+              </span>
+              <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--green-primary)', fontFamily: 'var(--font-heading)' }}>
+                {staffCheckinCount.toLocaleString()}
+              </div>
+              <span style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>Live scanned attendee count</span>
+            </div>
+
+            <div className="quest-card" style={{ padding: '14px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                 Public leaderboard accounts
               </span>
               <div style={{ fontSize: '24px', fontWeight: '800', color: '#00E676', fontFamily: 'var(--font-heading)' }}>
@@ -224,6 +236,14 @@ export const AdminDashboard = () => {
               >
                 <QrCode size={14} />
                 <span>Projector + Join QR</span>
+              </button>
+              <button
+                className="pill-btn-action pill-btn-secondary"
+                style={{ gridColumn: '1 / -1', fontSize: '12px', padding: '8px' }}
+                onClick={() => setActiveModal('scanner')}
+              >
+                <Users size={14} />
+                <span>Scan attendee badge to check in</span>
               </button>
             </div>
           </div>

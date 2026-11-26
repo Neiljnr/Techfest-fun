@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const ScannerModal = () => {
-  const { setActiveModal, handleQrScan, showToast } = useApp();
+  const { setActiveModal, handleQrScan, showToast, isAdmin } = useApp();
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -335,7 +335,7 @@ export const ScannerModal = () => {
         <div className="modal-header">
           <div className="modal-title-box">
             <Camera size={20} color="var(--green-primary)" />
-            <h3 className="modal-title">Universal QR Scanner</h3>
+            <h3 className="modal-title">{isAdmin ? 'Attendee Check-in Scanner' : 'Universal QR Scanner'}</h3>
           </div>
           <button 
             className="modal-close-btn"
@@ -344,6 +344,12 @@ export const ScannerModal = () => {
             <X size={18} />
           </button>
         </div>
+
+        {isAdmin && (
+          <p style={{ padding: '0 16px 10px', color: 'var(--text-muted)', fontSize: '12px' }}>
+            Scan the attendee’s My Badge QR to record their check-in. Repeat scans won’t increase the count.
+          </p>
+        )}
 
         {/* Viewfinder Area */}
         <div ref={frameRef} style={{
@@ -551,7 +557,11 @@ export const ScannerModal = () => {
                 </span>
                 <p style={{ color: 'var(--text-light)', marginTop: '2px' }}>
                   {scanResult.success
-                    ? scanResult.code
+                    ? scanResult.type === 'checkin'
+                      ? scanResult.already_checked_in
+                        ? `${scanResult.name} was already checked in.`
+                        : `${scanResult.name} checked in successfully.`
+                      : scanResult.code
                       ? `Code: ${scanResult.code}`
                       : `Captured ${scanResult.name || capturedTarget || 'target'}`
                     : scanResult.reason}

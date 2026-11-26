@@ -140,9 +140,12 @@ export const AppProvider = ({ children }) => {
   const [dataLoading, setDataLoading] = useState(false);
   const [backendError, setBackendError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const isAdminRef = useRef(false);
+  isAdminRef.current = isAdmin;
   const [points, setPoints] = useState(0);
   const [ledger, setLedger] = useState([]);
   const [adminLedger, setAdminLedger] = useState([]);
+  const [staffCheckinCount, setStaffCheckinCount] = useState(0);
   const [stage1Quests, setStage1Quests] = useState(INITIAL_STAGE1_QUESTS);
   const [connections, setConnections] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -193,6 +196,7 @@ export const AppProvider = ({ children }) => {
     setSignalDrops(snapshot.drops);
     setIsAdmin(snapshot.isAdmin);
     setStageSettings(snapshot.stages);
+    setStaffCheckinCount(snapshot.staffCheckinCount || 0);
   };
 
   const refreshData = async (authUser = session?.user) => {
@@ -230,7 +234,8 @@ export const AppProvider = ({ children }) => {
         supabase.from('stage_settings').select('*'),
         supabase.from('staff_ledger').select('*').order('created_at', { ascending: false }).limit(200),
         supabase.from('staff_event_codes').select('*').order('created_at', { ascending: false }),
-        supabase.from('staff_quiz_questions').select('*').order('sort_order', { ascending: true })
+        supabase.from('staff_quiz_questions').select('*').order('sort_order', { ascending: true }),
+        supabase.rpc('staff_get_checkin_count')
       ]);
       let results = await fetchAll();
       // Only new accounts (or a pending signup) need the profile created first.
@@ -249,7 +254,7 @@ export const AppProvider = ({ children }) => {
       }
       const [profileResult, stateResult, ledgerResult, connectionsResult,
         attendeesResult, boardResult, catalogResult, accessResult, stagesResult,
-        staffLedgerResult, eventCodesResult, staffQuizResult] = results;
+        staffLedgerResult, eventCodesResult, staffQuizResult, checkinCountResult] = results;
       const failed = results.slice(0, 9).find(result => result.error);
       if (failed) throw failed.error;
 
@@ -307,6 +312,7 @@ export const AppProvider = ({ children }) => {
         leaderboard: boardRows,
         drops,
         isAdmin: staff,
+        staffCheckinCount: staff && !checkinCountResult.error ? Number(checkinCountResult.data) || 0 : 0,
         stages: Object.fromEntries(stagesResult.data.map(row => [row.stage, row.active]))
       };
       applySnapshot(snapshot);
@@ -352,15 +358,17 @@ export const AppProvider = ({ children }) => {
 
   // Lightweight live poll: board, own notifications, and own score
   const pollLive = async (authUser) => {
-    const [boardResult, notifResult, stagesResult] = await Promise.all([
+    const [boardResult, notifResult, stagesResult, checkinResult] = await Promise.all([
       supabase.from('leaderboard').select('*').order('points', { ascending: false }),
       supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(30),
-      supabase.from('stage_settings').select('*')
+      supabase.from('stage_settings').select('*'),
+      ...(isAdminRef.current ? [supabase.rpc('staff_get_checkin_count')] : [])
     ]);
     if (!boardResult.error) setLeaderboard(mapBoardRows(boardResult.data));
     if (!stagesResult.error) {
       setStageSettings(Object.fromEntries(stagesResult.data.map(row => [row.stage, row.active])));
     }
+    if (isAdminRef.current && !checkinResult?.error) setStaffCheckinCount(Number(checkinResult.data) || 0);
     if (notifResult.error) return;
     const rows = notifResult.data;
     setNotifications(rows);
@@ -737,6 +745,19 @@ export const AppProvider = ({ children }) => {
     const attendeeToken = code.match(/^JTF26-ATT-([0-9a-f-]{36})$/i);
     try {
       if (attendeeToken) {
+        if (isAdmin) {
+          const { data: checkinData, error: checkinError } = await supabase.rpc('staff_check_in_attendee', {
+            p_qr_token: attendeeToken[1]
+          });
+          if (checkinError) throw checkinError;
+          await refreshData();
+          if (checkinData.already_checked_in) {
+            showToast('Already checked in', `${checkinData.name} is already on the attendance list.`, 'info');
+          } else {
+            showToast('Attendee checked in', `Welcome, ${checkinData.name}!`, 'success');
+          }
+          return { success: true, type: 'checkin', ...checkinData };
+        }
         const { data, error } = await supabase.rpc('request_connection', {
           p_qr_token: attendeeToken[1]
         });
@@ -895,6 +916,7 @@ export const AppProvider = ({ children }) => {
     points,
     ledger,
     adminLedger,
+    staffCheckinCount,
     currentRank,
     avatarMeta,
     roleMeta,
